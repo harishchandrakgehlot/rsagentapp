@@ -12,7 +12,15 @@ interface Props {
 }
 
 export function PropertyModal({ isOpen, onClose, onSuccess, propertyToEdit }: Props) {
-  const [name, setName] = useState(propertyToEdit?.name || '');
+  const [plotHouseNo, setPlotHouseNo] = useState(propertyToEdit?.plot_house_no || '');
+  const [addressLine1, setAddressLine1] = useState(propertyToEdit?.address_line_1 || propertyToEdit?.name || '');
+  const [addressLine2, setAddressLine2] = useState(propertyToEdit?.address_line_2 || '');
+  const [landmark, setLandmark] = useState(propertyToEdit?.landmark || '');
+  const [city, setCity] = useState(propertyToEdit?.city || '');
+  const [state, setState] = useState(propertyToEdit?.state || '');
+  const [postalCode, setPostalCode] = useState(propertyToEdit?.postal_code || '');
+  const [country, setCountry] = useState(propertyToEdit?.country || 'India');
+
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,9 +30,12 @@ export function PropertyModal({ isOpen, onClose, onSuccess, propertyToEdit }: Pr
     e.preventDefault();
     setError('');
 
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      setError('Please enter the property name / location.');
+    if (!plotHouseNo.trim() && !addressLine1.trim()) {
+      setError('Please enter Plot / House No. or Address Line 1.');
+      return;
+    }
+    if (!city.trim()) {
+      setError('Please enter City / Town / Village.');
       return;
     }
 
@@ -35,7 +46,14 @@ export function PropertyModal({ isOpen, onClose, onSuccess, propertyToEdit }: Pr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: propertyToEdit?.id,
-          name: trimmedName,
+          plot_house_no: plotHouseNo.trim(),
+          address_line_1: addressLine1.trim(),
+          address_line_2: addressLine2.trim(),
+          landmark: landmark.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          postal_code: postalCode.trim(),
+          country: country.trim() || 'India',
         }),
       });
 
@@ -55,8 +73,8 @@ export function PropertyModal({ isOpen, onClose, onSuccess, propertyToEdit }: Pr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 animate-in fade-in zoom-in-95 duration-150 my-8">
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700">
@@ -81,22 +99,117 @@ export function PropertyModal({ isOpen, onClose, onSuccess, propertyToEdit }: Pr
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Plot / House No. <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={plotHouseNo}
+                onChange={e => setPlotHouseNo(e.target.value)}
+                placeholder="e.g. Plot No. 42"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Address Line 1 <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={addressLine1}
+                onChange={e => setAddressLine1(e.target.value)}
+                placeholder="e.g. Palm Beach Road"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Address Line 2
+              </label>
+              <input
+                type="text"
+                value={addressLine2}
+                onChange={e => setAddressLine2(e.target.value)}
+                placeholder="e.g. Sector 15"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Landmark
+              </label>
+              <input
+                type="text"
+                value={landmark}
+                onChange={e => setLandmark(e.target.value)}
+                placeholder="e.g. Near Metro Station"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                City / Town / Village <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={city}
+                onChange={e => setCity(e.target.value)}
+                placeholder="e.g. Mumbai"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                State / UT <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={state}
+                onChange={e => setState(e.target.value)}
+                placeholder="e.g. Maharashtra"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Postal / ZIP <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={postalCode}
+                onChange={e => setPostalCode(e.target.value)}
+                placeholder="e.g. 400703"
+                className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Property Name & Location <span className="text-rose-500">*</span>
+              Country <span className="text-rose-500">*</span>
             </label>
-            <textarea
+            <input
+              type="text"
               required
-              rows={3}
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="e.g. Royal Palms Tower A, Flat 1402, Mumbai"
-              className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-slate-900 placeholder:text-slate-400"
+              value={country}
+              onChange={e => setCountry(e.target.value)}
+              placeholder="e.g. India"
+              className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 placeholder:text-slate-400"
             />
-            <p className="text-[11px] text-slate-500 mt-1">
-              Properties saved here are stored in the master list and reusable across future tokens.
-            </p>
           </div>
 
           <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
@@ -110,7 +223,7 @@ export function PropertyModal({ isOpen, onClose, onSuccess, propertyToEdit }: Pr
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs disabled:opacity-50"
+              className="px-4 py-2 text-xs font-semibold text-white bg-[#2D3774] hover:bg-[#222B5C] rounded-lg shadow-xs disabled:opacity-50"
             >
               {submitting ? 'Saving...' : propertyToEdit ? 'Save Changes' : 'Create Property'}
             </button>

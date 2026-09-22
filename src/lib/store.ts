@@ -1,6 +1,7 @@
 import {
   Agent,
   Property,
+  PropertyAddress,
   Token,
   Attachment,
   Reminder,
@@ -196,7 +197,74 @@ export function findOrCreateProperty(name: string): Property {
   return newProperty;
 }
 
-export function updateProperty(id: string, updates: Partial<Pick<Property, 'name' | 'is_active'>>): Property {
+export function formatPropertyAddress(addr: PropertyAddress): string {
+  const parts = [
+    addr.plot_house_no?.trim(),
+    addr.address_line_1?.trim(),
+    addr.address_line_2?.trim(),
+    addr.landmark?.trim() ? `Near ${addr.landmark.trim()}` : undefined,
+    addr.city?.trim(),
+    addr.state?.trim(),
+    addr.postal_code?.trim(),
+    addr.country?.trim() || 'India',
+  ].filter((p): p is string => Boolean(p && p.length > 0));
+  return parts.join(', ');
+}
+
+export function createPropertyWithAddress(addr: PropertyAddress & { name?: string }): Property {
+  const store = getStore();
+  const formattedName = addr.name?.trim() || formatPropertyAddress(addr);
+  if (!formattedName) {
+    throw new Error('Property address cannot be empty');
+  }
+
+  const existing = store.properties.find(
+    p => p.name.toLowerCase() === formattedName.toLowerCase()
+  );
+  if (existing) {
+    if (!existing.is_active) {
+      existing.is_active = true;
+      existing.updated_at = new Date().toISOString();
+    }
+    existing.plot_house_no = addr.plot_house_no?.trim() || existing.plot_house_no;
+    existing.address_line_1 = addr.address_line_1?.trim() || existing.address_line_1;
+    existing.address_line_2 = addr.address_line_2?.trim() || existing.address_line_2;
+    existing.landmark = addr.landmark?.trim() || existing.landmark;
+    existing.city = addr.city?.trim() || existing.city;
+    existing.state = addr.state?.trim() || existing.state;
+    existing.postal_code = addr.postal_code?.trim() || existing.postal_code;
+    existing.country = addr.country?.trim() || existing.country || 'India';
+    return existing;
+  }
+
+  const newProperty: Property = {
+    id: `pr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    name: formattedName,
+    plot_house_no: addr.plot_house_no?.trim(),
+    address_line_1: addr.address_line_1?.trim(),
+    address_line_2: addr.address_line_2?.trim(),
+    landmark: addr.landmark?.trim(),
+    city: addr.city?.trim(),
+    state: addr.state?.trim(),
+    postal_code: addr.postal_code?.trim(),
+    country: addr.country?.trim() || 'India',
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  store.properties.push(newProperty);
+  recordActivityLog({
+    action: 'property_created',
+    target_type: 'property',
+    target_id: newProperty.id,
+    summary: `Created property master record: "${newProperty.name}".`,
+  });
+
+  return newProperty;
+}
+
+export function updateProperty(id: string, updates: Partial<Property>): Property {
   const store = getStore();
   const index = store.properties.findIndex(p => p.id === id);
   if (index === -1) throw new Error('Property not found');
@@ -364,6 +432,7 @@ export interface CreateTokenInput {
   agent_mobile_number?: string;
   property_id?: string;
   property_name?: string;
+  property_address?: PropertyAddress;
   start_date: string;
   end_date: string;
   token_description?: string;
@@ -407,15 +476,19 @@ export function createToken(input: CreateTokenInput): Token {
 
   const mobileToUse = input.agent_mobile_number?.trim() || agent.mobile;
 
-  // Resolve Property (Auto-create if property_name supplied)
+  // Resolve Property (Structured Address or property_name or property_id)
   let propertyId = input.property_id;
-  if (!propertyId && input.property_name) {
+  if (!propertyId && input.property_address) {
+    const prop = createPropertyWithAddress(input.property_address);
+    propertyId = prop.id;
+  } else if (!propertyId && input.property_name) {
     const prop = findOrCreateProperty(input.property_name);
     propertyId = prop.id;
   }
   if (!propertyId) {
     throw new Error('A valid property is required');
   }
+
 
   const newToken: Token = {
     id: `tok-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,

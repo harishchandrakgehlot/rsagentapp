@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getProperties, findOrCreateProperty, updateProperty, togglePropertyStatus } from '@/lib/store';
+import {
+  getProperties,
+  findOrCreateProperty,
+  createPropertyWithAddress,
+  updateProperty,
+  togglePropertyStatus,
+} from '@/lib/store';
 import { getSuperAdminSession } from '@/lib/auth';
 
 export async function GET(request: Request) {
@@ -16,12 +22,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { name } = await request.json();
-    if (!name) {
-      return NextResponse.json({ error: 'Property name is required.' }, { status: 400 });
+    const body = await request.json();
+    let property;
+    if (body.address_line_1 || body.plot_house_no || body.city) {
+      property = createPropertyWithAddress(body);
+    } else if (body.name) {
+      property = findOrCreateProperty(body.name);
+    } else {
+      return NextResponse.json({ error: 'Property address or name is required.' }, { status: 400 });
     }
 
-    const property = findOrCreateProperty(name);
     return NextResponse.json({ success: true, property });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error creating property';

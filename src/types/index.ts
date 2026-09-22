@@ -15,7 +15,18 @@ export interface Agent {
   updated_at: string;
 }
 
-export interface Property {
+export interface PropertyAddress {
+  plot_house_no?: string;
+  address_line_1?: string;
+  address_line_2?: string;
+  landmark?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+}
+
+export interface Property extends PropertyAddress {
   id: string;
   name: string;
   is_active: boolean;
