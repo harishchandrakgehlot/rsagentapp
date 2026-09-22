@@ -60,7 +60,7 @@ export default function PublicLandingPage() {
                     setQuery(e.target.value);
                     if (error) setError('');
                   }}
-                  placeholder="Enter exact token number (e.g. RS-2026-8801)"
+                  placeholder="Enter exact token number (e.g. RS-2026-0001)"
                   className="w-full pl-12 pr-4 py-3 text-sm sm:text-base font-mono rounded-2xl bg-[#0F1633] border border-[#2D3774] focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 text-white placeholder:text-slate-400 shadow-inner"
                 />
               </div>
@@ -77,25 +77,6 @@ export default function PublicLandingPage() {
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
-
-            <div className="mt-4 pt-4 border-t border-slate-700/60 flex items-center justify-center gap-4 text-xs text-slate-300">
-              <span>Try sample tokens:</span>
-              <button
-                type="button"
-                onClick={() => setQuery('RS-2026-8801')}
-                className="font-mono text-blue-300 hover:underline hover:text-white"
-              >
-                RS-2026-8801
-              </button>
-              <span>•</span>
-              <button
-                type="button"
-                onClick={() => setQuery('RS-2026-8802')}
-                className="font-mono text-blue-300 hover:underline hover:text-white"
-              >
-                RS-2026-8802
-              </button>
-            </div>
           </div>
 
           {/* Feature Highlights */}

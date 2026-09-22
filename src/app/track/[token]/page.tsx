@@ -94,20 +94,30 @@ export default async function PublicTokenTrackPage({ params }: Props) {
           {/* Main Card */}
           <div className="bg-slate-900/90 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden backdrop-blur-md">
             {/* Brand Logo & Top Banner */}
-            <div className="bg-gradient-to-r from-[#2D3774]/30 via-[#2D3774]/15 to-transparent p-6 sm:p-8 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-widest text-blue-300">
-                    Official Service Token
-                  </span>
-                  <TokenStatusBadge status={token.computed_status} size="sm" />
+            <div className="bg-gradient-to-r from-[#2D3774]/30 via-[#2D3774]/15 to-transparent p-6 sm:p-8 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                <div className="bg-white p-3 rounded-2xl shadow-md border border-white/20 shrink-0 self-start sm:self-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/logo.png"
+                    alt="Royal Services - A Step Ahead"
+                    className="h-14 w-auto object-contain block"
+                  />
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-mono font-bold text-white tracking-tight">
-                  {token.token_number}
-                </h1>
-                <p className="text-xs text-slate-300">
-                  Client / Associate: <strong className="text-white">{token.associate_name}</strong>
-                </p>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-blue-300">
+                      Official Service Token
+                    </span>
+                    <TokenStatusBadge status={token.computed_status} size="sm" />
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl font-mono font-bold text-white tracking-tight">
+                    {token.token_number}
+                  </h1>
+                  <p className="text-xs text-slate-300">
+                    Client / Associate: <strong className="text-white">{token.associate_name}</strong>
+                  </p>
+                </div>
               </div>
 
               {/* QR Code Container */}

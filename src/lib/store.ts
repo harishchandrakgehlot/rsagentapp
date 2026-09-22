@@ -53,6 +53,19 @@ function getStore() {
   return globalThis.__rsStore;
 }
 
+export function clearStore() {
+  globalThis.__rsStore = {
+    agents: [],
+    properties: [],
+    tokens: [],
+    attachments: [],
+    reminders: [],
+    activityLogs: [],
+  };
+  return globalThis.__rsStore;
+}
+
+
 // -------------------------------------------------------------
 // AGENTS
 // -------------------------------------------------------------

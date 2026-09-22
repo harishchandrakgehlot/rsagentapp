@@ -28,6 +28,7 @@ import {
   getArchivedTokens,
   recordReminderAttempt,
   getActivityLogs,
+  clearStore,
 } from '../src/lib/store';
 import { generateTokenCSV, generateAgentCSV, sanitizeCSVValue } from '../src/lib/export';
 import { buildReminderMessageText } from '../src/lib/whatsapp';
@@ -50,6 +51,43 @@ async function runTests() {
   console.log('\n======================================================');
   console.log(' Royal Services - Automated Acceptance Criteria Suite ');
   console.log('======================================================\n');
+
+  clearStore();
+
+  // Create isolated test fixtures for the test suite
+  const setupAgent = createAgent({
+    name: 'Vikram Sharma',
+    mobile: '+919820123456',
+  });
+  const setupProperty = findOrCreateProperty('Royal Palms Tower A, Flat 1402, Mumbai');
+
+  const baseActiveToken = createToken({
+    token_number: 'RS-2026-8801',
+    associate_name: 'Aditya Birla Capital',
+    agent_id: setupAgent.id,
+    property_id: setupProperty.id,
+    start_date: '2026-09-01',
+    end_date: '2026-10-30',
+  });
+
+  const baseArchivedToken = createToken({
+    token_number: 'RS-2026-8500',
+    associate_name: 'Heritage Villa Estates',
+    agent_id: setupAgent.id,
+    property_id: setupProperty.id,
+    start_date: '2026-06-01',
+    end_date: '2026-07-31',
+  });
+  archiveToken(baseArchivedToken.id);
+
+  const baseExpiredToken = createToken({
+    token_number: 'RS-2026-8750',
+    associate_name: 'Apex Realty Solutions',
+    agent_id: setupAgent.id,
+    property_id: setupProperty.id,
+    start_date: '2026-07-01',
+    end_date: '2026-08-31',
+  });
 
   // -------------------------------------------------------------
   // AC 05 & AC 06: Date Validation & Status Computation in IST
@@ -83,10 +121,10 @@ async function runTests() {
     createToken({
       token_number: 'TEST-INVALID-DATES',
       associate_name: 'Test Associate',
-      agent_id: 'ag-001',
+      agent_id: setupAgent.id,
       start_date: '2026-10-10',
       end_date: '2026-10-05', // earlier than start date!
-      property_id: 'pr-001',
+      property_id: setupProperty.id,
     });
   } catch (err: unknown) {
     if (err instanceof Error && err.message.includes('End Date cannot be earlier than Start Date')) {
@@ -102,12 +140,12 @@ async function runTests() {
   let duplicateActiveRejected = false;
   try {
     createToken({
-      token_number: 'RS-2026-8801', // Already exists in INITIAL_TOKENS
+      token_number: 'RS-2026-8801', // Already exists in active token fixture
       associate_name: 'Dupe Associate',
-      agent_id: 'ag-001',
+      agent_id: setupAgent.id,
       start_date: '2026-09-01',
       end_date: '2026-10-30',
-      property_id: 'pr-001',
+      property_id: setupProperty.id,
     });
   } catch (err: unknown) {
     if (err instanceof Error && err.message.includes('already exists')) {
@@ -116,16 +154,16 @@ async function runTests() {
   }
   assert(duplicateActiveRejected, 'AC 02.1: Duplicate active token number is rejected');
 
-  // Duplicate against archived token (RS-2026-8500 is archived in mock)
+  // Duplicate against archived token (RS-2026-8500 is archived)
   let duplicateArchivedRejected = false;
   try {
     createToken({
-      token_number: 'RS-2026-8500', // Archived token!
+      token_number: 'RS-2026-8500', // Archived token fixture!
       associate_name: 'Dupe Archived Associate',
-      agent_id: 'ag-001',
+      agent_id: setupAgent.id,
       start_date: '2026-09-01',
       end_date: '2026-10-30',
-      property_id: 'pr-001',
+      property_id: setupProperty.id,
     });
   } catch (err: unknown) {
     if (err instanceof Error && err.message.includes('already exists')) {
@@ -335,7 +373,11 @@ async function runTests() {
   console.log('\n======================================================');
   console.log(` ALL ${passedTests}/${totalTests} ACCEPTANCE CRITERIA TESTS PASSED SUCCESSFULLY! `);
   console.log('======================================================\n');
+
+  // Leave store fresh and completely empty
+  clearStore();
 }
+
 
 runTests().catch(err => {
   console.error('\nVerification failed:', err);
