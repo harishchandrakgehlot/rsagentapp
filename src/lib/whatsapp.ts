@@ -1,5 +1,6 @@
 import { Token, ReminderType } from '@/types';
 import { formatReadableISTDate } from './ist';
+import { getWhatsAppToken } from './store';
 
 export interface WhatsAppSendResult {
   success: boolean;
@@ -58,7 +59,7 @@ export async function sendWhatsAppReminder(
   token: Token,
   reminderType: ReminderType
 ): Promise<WhatsAppSendResult> {
-  const tokenSecret = process.env.META_WHATSAPP_TOKEN;
+  const tokenSecret = getWhatsAppToken();
   const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1281001591773327';
   let recipient = token.agent_mobile_number.replace(/\D/g, ''); // E.164 digits without +
   if (recipient.length === 10) {
@@ -140,7 +141,7 @@ export async function sendDirectWhatsAppMessage({
   token?: string;
   phoneNumberId?: string;
 }): Promise<WhatsAppSendResult & { rawResponse?: unknown }> {
-  const tokenSecret = token || process.env.META_WHATSAPP_TOKEN;
+  const tokenSecret = token || getWhatsAppToken();
   const phoneId = phoneNumberId || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1281001591773327';
   let recipient = to.replace(/\D/g, '');
   if (recipient.length === 10) {

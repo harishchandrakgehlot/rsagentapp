@@ -22,6 +22,8 @@ export default function AdminSettingsPage() {
   // Meta WhatsApp Live Tester state
   const [testPhone, setTestPhone] = useState('');
   const [customToken, setCustomToken] = useState('');
+  const [hasSavedToken, setHasSavedToken] = useState(false);
+  const [savingToken, setSavingToken] = useState(false);
   const [sendingTestMsg, setSendingTestMsg] = useState(false);
   const [testMsgResult, setTestMsgResult] = useState<{
     success: boolean;
@@ -30,10 +32,44 @@ export default function AdminSettingsPage() {
   } | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    fetch('/api/whatsapp/config')
+      .then(res => res.json())
+      .then(data => {
+        if (data.hasToken) {
+          setHasSavedToken(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleSaveToken = async () => {
+    if (!customToken.trim()) return;
+    setSavingToken(true);
+    try {
+      const res = await fetch('/api/whatsapp/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: customToken.trim() }),
+      });
+      if (res.ok) {
+        setHasSavedToken(true);
+        setTestMsgResult({
+          success: true,
+          message: '💾 Token saved successfully as active system token for automated reminders!',
+        });
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSavingToken(false);
+    }
   };
 
   const handleSendTestMessage = async (e: React.FormEvent) => {
@@ -266,6 +302,21 @@ export default function AdminSettingsPage() {
                   placeholder="Paste token starting with EAAB..."
                   className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
                 />
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-[10px] text-slate-500">
+                    {hasSavedToken ? '✅ Active token stored' : 'No permanent token saved'}
+                  </span>
+                  {customToken.trim() && (
+                    <button
+                      type="button"
+                      onClick={handleSaveToken}
+                      disabled={savingToken}
+                      className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {savingToken ? 'Saving...' : '💾 Save as Active Token'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div>

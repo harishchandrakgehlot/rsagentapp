@@ -66,6 +66,14 @@ export function clearStore() {
   return globalThis.__rsStore;
 }
 
+let storedWhatsAppToken = '';
+export function setWhatsAppToken(token: string) {
+  storedWhatsAppToken = token.trim();
+}
+export function getWhatsAppToken(): string {
+  return storedWhatsAppToken || process.env.META_WHATSAPP_TOKEN || '';
+}
+
 
 // -------------------------------------------------------------
 // AGENTS
