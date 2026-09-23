@@ -10,7 +10,7 @@ export function PublicHeader() {
     <header className="bg-[#161E42] text-white border-b border-slate-800 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
         <Link href="/" className="flex items-center space-x-3 group">
-          <RoyalLogo variant="horizontal" theme="dark" height={36} />
+          <RoyalLogo variant="horizontal" theme="dark" height={40} width={140} />
         </Link>
 
         <div className="flex items-center space-x-3 sm:space-x-4">
