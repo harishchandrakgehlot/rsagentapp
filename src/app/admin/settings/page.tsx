@@ -13,18 +13,35 @@ import {
   AlertTriangle,
   RefreshCw,
   ExternalLink,
+  Phone,
+  Check,
+  Sparkles,
+  Edit3,
 } from 'lucide-react';
 
 export default function AdminSettingsPage() {
   const [testingCron, setTestingCron] = useState(false);
   const [cronResult, setCronResult] = useState<string | null>(null);
 
-  // Meta WhatsApp Live Tester state
+  // Meta WhatsApp Config & Tester state
   const [testPhone, setTestPhone] = useState('');
   const [customToken, setCustomToken] = useState('');
+  const [phoneNumberId, setPhoneNumberId] = useState('1281001591773327');
+  const [editPhoneIdValue, setEditPhoneIdValue] = useState('1281001591773327');
+  const [isEditingPhoneId, setIsEditingPhoneId] = useState(false);
+  const [businessPhone, setBusinessPhone] = useState('919029011341');
+  const [businessAccountId, setBusinessAccountId] = useState('1112101401393002');
   const [hasSavedToken, setHasSavedToken] = useState(false);
   const [savingToken, setSavingToken] = useState(false);
+  const [savingPhoneId, setSavingPhoneId] = useState(false);
   const [sendingTestMsg, setSendingTestMsg] = useState(false);
+  const [fetchingNumbers, setFetchingNumbers] = useState(false);
+  const [detectedNumbers, setDetectedNumbers] = useState<Array<{
+    id: string;
+    display_phone_number?: string;
+    verified_name?: string;
+    quality_rating?: string;
+  }> | null>(null);
   const [testMsgResult, setTestMsgResult] = useState<{
     success: boolean;
     message: string;
@@ -36,9 +53,13 @@ export default function AdminSettingsPage() {
     fetch('/api/whatsapp/config')
       .then(res => res.json())
       .then(data => {
-        if (data.hasToken) {
-          setHasSavedToken(true);
+        if (data.hasToken) setHasSavedToken(true);
+        if (data.phoneNumberId) {
+          setPhoneNumberId(data.phoneNumberId);
+          setEditPhoneIdValue(data.phoneNumberId);
         }
+        if (data.businessPhone) setBusinessPhone(data.businessPhone);
+        if (data.businessAccountId) setBusinessAccountId(data.businessAccountId);
       })
       .catch(() => {});
   }, []);
@@ -72,6 +93,75 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const handleSavePhoneId = async () => {
+    if (!editPhoneIdValue.trim()) return;
+    setSavingPhoneId(true);
+    try {
+      const res = await fetch('/api/whatsapp/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumberId: editPhoneIdValue.trim() }),
+      });
+      if (res.ok) {
+        setPhoneNumberId(editPhoneIdValue.trim());
+        setIsEditingPhoneId(false);
+        setTestMsgResult({
+          success: true,
+          message: `💾 Phone Number ID updated to ${editPhoneIdValue.trim()}!`,
+        });
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSavingPhoneId(false);
+    }
+  };
+
+  const handleFetchNumbers = async () => {
+    setFetchingNumbers(true);
+    setTestMsgResult(null);
+    try {
+      const url = customToken.trim()
+        ? `/api/whatsapp/numbers?token=${encodeURIComponent(customToken.trim())}`
+        : `/api/whatsapp/numbers`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.numbers)) {
+        setDetectedNumbers(data.numbers);
+        if (data.matched) {
+          setPhoneNumberId(data.matched.id);
+          setEditPhoneIdValue(data.matched.id);
+          setTestMsgResult({
+            success: true,
+            message: `🎯 Found business number ${data.matched.display_phone_number}! Auto-selected Phone Number ID: ${data.matched.id}`,
+          });
+        } else if (data.numbers.length > 0) {
+          setTestMsgResult({
+            success: true,
+            message: `Found ${data.numbers.length} registered phone number(s) in Meta. Click below to use one.`,
+          });
+        } else {
+          setTestMsgResult({
+            success: false,
+            message: `No phone numbers registered in Meta under WABA ID ${businessAccountId} yet. Follow the steps below to add +91 90290 11341 in Meta.`,
+          });
+        }
+      } else {
+        setTestMsgResult({
+          success: false,
+          message: data.error || 'Could not fetch numbers from Meta. Make sure token is entered.',
+        });
+      }
+    } catch (e: unknown) {
+      setTestMsgResult({
+        success: false,
+        message: e instanceof Error ? e.message : 'Error querying Meta API',
+      });
+    } finally {
+      setFetchingNumbers(false);
+    }
+  };
+
   const handleSendTestMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!testPhone.trim()) return;
@@ -86,7 +176,7 @@ export default function AdminSettingsPage() {
         body: JSON.stringify({
           recipient: testPhone.trim(),
           token: customToken.trim() || undefined,
-          phoneNumberId: '1281001591773327',
+          phoneNumberId: phoneNumberId.trim() || undefined,
         }),
       });
 
@@ -213,39 +303,177 @@ export default function AdminSettingsPage() {
         </div>
 
         {/* Credentials Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          {/* Business Phone Card */}
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
             <div>
-              <span className="text-slate-400 font-semibold block uppercase mb-0.5 text-[11px]">
-                Phone Number ID
+              <span className="text-slate-400 font-semibold block uppercase mb-0.5 text-[10px] flex items-center gap-1">
+                <Phone className="w-3 h-3 text-emerald-600" />
+                Sender WhatsApp Number
               </span>
               <p className="font-mono text-slate-900 font-bold text-xs">
-                1281001591773327
+                +91 {businessPhone.replace(/^91/, '')}
               </p>
             </div>
             <button
-              onClick={() => handleCopy('1281001591773327', 'phone_id')}
+              type="button"
+              onClick={() => handleCopy(`+91 ${businessPhone.replace(/^91/, '')}`, 'biz_phone')}
               className="px-2.5 py-1 text-[11px] bg-white border border-slate-200 rounded-lg hover:bg-slate-100 text-slate-700 font-medium"
             >
-              {copiedKey === 'phone_id' ? 'Copied!' : 'Copy'}
+              {copiedKey === 'biz_phone' ? 'Copied!' : 'Copy'}
             </button>
           </div>
 
+          {/* Phone Number ID Card */}
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-slate-400 font-semibold block uppercase text-[10px]">
+                Active Phone Number ID
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsEditingPhoneId(!isEditingPhoneId)}
+                className="text-[10px] text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-0.5"
+              >
+                <Edit3 className="w-2.5 h-2.5" />
+                {isEditingPhoneId ? 'Cancel' : 'Change'}
+              </button>
+            </div>
+
+            {isEditingPhoneId ? (
+              <div className="flex items-center gap-1.5 mt-1">
+                <input
+                  type="text"
+                  value={editPhoneIdValue}
+                  onChange={e => setEditPhoneIdValue(e.target.value)}
+                  placeholder="Enter Phone Number ID"
+                  className="w-full px-2 py-1 text-xs font-mono rounded border border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={handleSavePhoneId}
+                  disabled={savingPhoneId}
+                  className="px-2 py-1 text-[11px] bg-emerald-600 text-white rounded font-medium hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  Save
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <p className="font-mono text-slate-900 font-bold text-xs truncate mr-1">
+                  {phoneNumberId}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(phoneNumberId, 'phone_id')}
+                  className="px-2 py-0.5 text-[11px] bg-white border border-slate-200 rounded-lg hover:bg-slate-100 text-slate-700 font-medium shrink-0"
+                >
+                  {copiedKey === 'phone_id' ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* WABA ID Card */}
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
             <div>
-              <span className="text-slate-400 font-semibold block uppercase mb-0.5 text-[11px]">
+              <span className="text-slate-400 font-semibold block uppercase mb-0.5 text-[10px]">
                 WhatsApp Business Account ID
               </span>
               <p className="font-mono text-slate-900 font-bold text-xs">
-                1112101401393002
+                {businessAccountId}
               </p>
             </div>
             <button
-              onClick={() => handleCopy('1112101401393002', 'waba_id')}
+              type="button"
+              onClick={() => handleCopy(businessAccountId, 'waba_id')}
               className="px-2.5 py-1 text-[11px] bg-white border border-slate-200 rounded-lg hover:bg-slate-100 text-slate-700 font-medium"
             >
               {copiedKey === 'waba_id' ? 'Copied!' : 'Copy'}
             </button>
+          </div>
+        </div>
+
+        {/* Sync & Auto-Detect Numbers Button */}
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl text-xs">
+          <div>
+            <p className="font-bold text-emerald-950 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Looking for your business number ID?</span>
+            </p>
+            <p className="text-[11px] text-emerald-800">
+              Query Meta to automatically fetch registered Phone Number IDs under WABA ID {businessAccountId}.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleFetchNumbers}
+            disabled={fetchingNumbers}
+            className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-semibold text-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${fetchingNumbers ? 'animate-spin' : ''}`} />
+            <span>{fetchingNumbers ? 'Scanning Meta...' : 'Auto-Detect Phone Numbers'}</span>
+          </button>
+        </div>
+
+        {/* Detected numbers card if any */}
+        {detectedNumbers && detectedNumbers.length > 0 && (
+          <div className="p-3 bg-white border border-emerald-200 rounded-xl space-y-2 text-xs">
+            <span className="font-bold text-slate-800 block text-[11px] uppercase">
+              Registered Phone Numbers Found in Meta:
+            </span>
+            <div className="space-y-1.5">
+              {detectedNumbers.map(num => (
+                <div key={num.id} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                  <div>
+                    <span className="font-bold font-mono text-slate-900">{num.display_phone_number || num.id}</span>
+                    {num.verified_name && (
+                      <span className="ml-2 text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-medium">
+                        {num.verified_name}
+                      </span>
+                    )}
+                    <span className="block text-[10px] text-slate-500 font-mono">ID: {num.id}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhoneNumberId(num.id);
+                      setEditPhoneIdValue(num.id);
+                      handleSavePhoneId();
+                    }}
+                    className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
+                      phoneNumberId === num.id
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {phoneNumberId === num.id ? '✓ Currently Active' : 'Use this Number ID'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Guide for 919029011341 */}
+        <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2 text-xs">
+          <p className="font-bold text-amber-950 flex items-center gap-1.5">
+            <Phone className="w-4 h-4 text-amber-700" />
+            <span>How to Link +91 90290 11341 in Meta Developer Console</span>
+          </p>
+          <div className="space-y-1.5 text-amber-900 text-[11px] leading-relaxed">
+            <p>
+              1. Open your <strong>Meta App Dashboard &gt; WhatsApp &gt; API Setup</strong>.
+            </p>
+            <p>
+              2. Scroll down to <strong>Step 5: Add a phone number</strong>, click <strong>Add phone number</strong>, and enter display name <em>Royal Services</em> and number <em>90290 11341</em>.
+            </p>
+            <p>
+              3. Verify the OTP sent to your phone. Once added, go back to <strong>Step 1</strong> at the top, select <strong>+91 90290 11341</strong> from the <em>From</em> dropdown.
+            </p>
+            <p>
+              4. Meta will display your new <strong>Phone number ID</strong>. Paste it above or click <strong>Auto-Detect Phone Numbers</strong> to sync it automatically!
+            </p>
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getWhatsAppToken, setWhatsAppToken } from '@/lib/store';
+import { getWhatsAppConfig, setWhatsAppConfig } from '@/lib/store';
 import { getSuperAdminSession } from '@/lib/auth';
 
 export async function GET() {
@@ -9,12 +9,13 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const token = getWhatsAppToken();
+    const config = getWhatsAppConfig();
     return NextResponse.json({
-      hasToken: Boolean(token),
-      tokenPreview: token ? `${token.slice(0, 10)}...${token.slice(-5)}` : null,
-      phoneNumberId: process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1281001591773327',
-      businessAccountId: process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID || '1112101401393002',
+      hasToken: Boolean(config.token),
+      tokenPreview: config.token ? `${config.token.slice(0, 10)}...${config.token.slice(-5)}` : null,
+      phoneNumberId: config.phoneNumberId,
+      businessAccountId: config.businessAccountId,
+      businessPhone: config.businessPhone,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error checking config';
@@ -29,15 +30,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { token } = await request.json();
-    if (!token || typeof token !== 'string') {
-      return NextResponse.json({ error: 'Token is required' }, { status: 400 });
-    }
+    const body = await request.json();
+    const { token, phoneNumberId, businessAccountId, businessPhone } = body;
 
-    setWhatsAppToken(token);
+    setWhatsAppConfig({
+      token: token !== undefined ? token : undefined,
+      phoneNumberId: phoneNumberId !== undefined ? phoneNumberId : undefined,
+      businessAccountId: businessAccountId !== undefined ? businessAccountId : undefined,
+      businessPhone: businessPhone !== undefined ? businessPhone : undefined,
+    });
+
     return NextResponse.json({
       success: true,
-      message: 'Active Meta WhatsApp token saved successfully!',
+      config: getWhatsAppConfig(),
+      message: 'Active Meta WhatsApp configuration saved successfully!',
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error saving config';

@@ -66,12 +66,45 @@ export function clearStore() {
   return globalThis.__rsStore;
 }
 
-let storedWhatsAppToken = '';
-export function setWhatsAppToken(token: string) {
-  storedWhatsAppToken = token.trim();
+export interface WhatsAppIntegrationConfig {
+  token: string;
+  phoneNumberId: string;
+  businessAccountId: string;
+  businessPhone: string;
 }
+
+const storedWhatsAppConfig: Partial<WhatsAppIntegrationConfig> = {
+  businessPhone: process.env.META_WHATSAPP_BUSINESS_PHONE || '919029011341',
+  phoneNumberId: process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1281001591773327',
+  businessAccountId: process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID || '1112101401393002',
+};
+
+export function setWhatsAppConfig(config: Partial<WhatsAppIntegrationConfig>) {
+  if (config.token !== undefined) storedWhatsAppConfig.token = config.token.trim();
+  if (config.phoneNumberId !== undefined) storedWhatsAppConfig.phoneNumberId = config.phoneNumberId.trim();
+  if (config.businessAccountId !== undefined) storedWhatsAppConfig.businessAccountId = config.businessAccountId.trim();
+  if (config.businessPhone !== undefined) storedWhatsAppConfig.businessPhone = config.businessPhone.trim();
+}
+
+export function getWhatsAppConfig(): WhatsAppIntegrationConfig {
+  return {
+    token: storedWhatsAppConfig.token || process.env.META_WHATSAPP_TOKEN || '',
+    phoneNumberId: storedWhatsAppConfig.phoneNumberId || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1281001591773327',
+    businessAccountId: storedWhatsAppConfig.businessAccountId || process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID || '1112101401393002',
+    businessPhone: storedWhatsAppConfig.businessPhone || process.env.META_WHATSAPP_BUSINESS_PHONE || '919029011341',
+  };
+}
+
+export function setWhatsAppToken(token: string) {
+  setWhatsAppConfig({ token });
+}
+
 export function getWhatsAppToken(): string {
-  return storedWhatsAppToken || process.env.META_WHATSAPP_TOKEN || '';
+  return getWhatsAppConfig().token;
+}
+
+export function getWhatsAppPhoneNumberId(): string {
+  return getWhatsAppConfig().phoneNumberId;
 }
 
 
