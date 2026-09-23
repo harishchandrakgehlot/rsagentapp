@@ -135,12 +135,14 @@ export async function sendDirectWhatsAppMessage({
   body,
   token,
   phoneNumberId,
+  templateName,
 }: {
   to: string;
-  body: string;
+  body?: string;
   token?: string;
   phoneNumberId?: string;
-}): Promise<WhatsAppSendResult & { rawResponse?: unknown }> {
+  templateName?: string;
+}): Promise<WhatsAppSendResult & { rawResponse?: unknown; sentAs?: 'template' | 'text' }> {
   const tokenSecret = token || getWhatsAppToken();
   const phoneId = phoneNumberId || getWhatsAppPhoneNumberId();
   let recipient = to.replace(/\D/g, '');
@@ -158,7 +160,28 @@ export async function sendDirectWhatsAppMessage({
   }
 
   try {
-    // Attempt sending as text message first
+    let sentAs: 'template' | 'text' = templateName ? 'template' : 'text';
+    const payload = templateName
+      ? {
+          messaging_product: 'whatsapp',
+          to: recipient,
+          type: 'template',
+          template: {
+            name: templateName,
+            language: { code: 'en_US' },
+          },
+        }
+      : {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: recipient,
+          type: 'text',
+          text: {
+            preview_url: true,
+            body: body || 'Hello from Royal Services!',
+          },
+        };
+
     let response = await fetch(
       `https://graph.facebook.com/v22.0/${phoneId}/messages`,
       {
@@ -167,24 +190,15 @@ export async function sendDirectWhatsAppMessage({
           Authorization: `Bearer ${tokenSecret}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: recipient,
-          type: 'text',
-          text: {
-            preview_url: true,
-            body,
-          },
-        }),
+        body: JSON.stringify(payload),
       }
     );
 
     let data = await response.json();
 
-    // If Meta rejects freeform text because a template is required outside the 24-hour window,
-    // fallback to Meta's standard pre-approved "hello_world" template
-    if (!response.ok && data.error?.code === 131047) {
+    // If text message fails outside 24h window (code 131047), fallback to template
+    if (!response.ok && data.error?.code === 131047 && !templateName) {
+      sentAs = 'template';
       response = await fetch(
         `https://graph.facebook.com/v22.0/${phoneId}/messages`,
         {
@@ -219,6 +233,7 @@ export async function sendDirectWhatsAppMessage({
     return {
       success: true,
       providerId: msgId,
+      sentAs,
       simulated: false,
       rawResponse: data,
     };

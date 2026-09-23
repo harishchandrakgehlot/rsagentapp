@@ -9,7 +9,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { recipient, message, token, phoneNumberId } = await request.json();
+    const { recipient, message, token, phoneNumberId, mode } = await request.json();
 
     if (!recipient) {
       return NextResponse.json(
@@ -18,6 +18,7 @@ export async function POST(request: Request) {
       );
     }
 
+    const isTemplate = mode === 'template';
     const testBody =
       message ||
       `*Royal Services - Meta WhatsApp Cloud API Test*\n\n` +
@@ -28,9 +29,10 @@ export async function POST(request: Request) {
 
     const result = await sendDirectWhatsAppMessage({
       to: recipient,
-      body: testBody,
+      body: isTemplate ? undefined : testBody,
       token,
       phoneNumberId,
+      templateName: isTemplate ? 'hello_world' : undefined,
     });
 
     if (!result.success) {
@@ -43,7 +45,10 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       providerId: result.providerId,
-      message: 'Test message successfully dispatched via Meta WhatsApp API!',
+      sentAs: result.sentAs,
+      message: isTemplate
+        ? 'Official verified "hello_world" template delivered successfully via Meta!'
+        : 'Custom test message successfully dispatched via Meta WhatsApp API!',
       raw: result.rawResponse,
     });
   } catch (err: unknown) {

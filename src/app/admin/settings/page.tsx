@@ -26,6 +26,7 @@ export default function AdminSettingsPage() {
   // Meta WhatsApp Config & Tester state
   const [testPhone, setTestPhone] = useState('');
   const [customToken, setCustomToken] = useState('');
+  const [testMode, setTestMode] = useState<'template' | 'custom'>('template');
   const [phoneNumberId, setPhoneNumberId] = useState('1281001591773327');
   const [editPhoneIdValue, setEditPhoneIdValue] = useState('1281001591773327');
   const [isEditingPhoneId, setIsEditingPhoneId] = useState(false);
@@ -210,6 +211,7 @@ export default function AdminSettingsPage() {
           recipient: testPhone.trim(),
           token: tokenParam,
           phoneNumberId: phoneNumberId.trim() || undefined,
+          mode: testMode,
         }),
       });
 
@@ -217,7 +219,7 @@ export default function AdminSettingsPage() {
       if (res.ok && data.success) {
         setTestMsgResult({
           success: true,
-          message: `✅ Message sent successfully! Provider Msg ID: ${data.providerId}`,
+          message: `✅ Message sent successfully! ${data.message || ''} Provider Msg ID: ${data.providerId}`,
         });
       } else {
         setTestMsgResult({
@@ -595,9 +597,68 @@ export default function AdminSettingsPage() {
               </div>
             </div>
 
+            {/* Message Delivery Mode Selection */}
+            <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
+              <span className="text-[11px] font-semibold text-slate-700 uppercase block">
+                Select Message Format:
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <label
+                  onClick={() => setTestMode('template')}
+                  className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                    testMode === 'template'
+                      ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 font-medium ring-1 ring-emerald-400'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="testMode"
+                    checked={testMode === 'template'}
+                    onChange={() => setTestMode('template')}
+                    className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div>
+                    <span className="font-bold block text-[11px] text-emerald-900 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                      Verified Template (&quot;hello_world&quot;)
+                    </span>
+                    <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
+                      Guaranteed instant delivery anytime. Bypasses 24-hour window restriction.
+                    </span>
+                  </div>
+                </label>
+
+                <label
+                  onClick={() => setTestMode('custom')}
+                  className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                    testMode === 'custom'
+                      ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 font-medium ring-1 ring-emerald-400'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="testMode"
+                    checked={testMode === 'custom'}
+                    onChange={() => setTestMode('custom')}
+                    className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <div>
+                    <span className="font-bold block text-[11px] text-slate-900">
+                      Custom Text Notification
+                    </span>
+                    <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
+                      Delivers only if recipient sent a message to +91 90290 11341 in the last 24 hours.
+                    </span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between pt-1">
-              <span className="text-[11px] text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-                ⚠️ Ensure the recipient number is added in Meta &quot;Manage phone number list&quot; for the test number.
+              <span className="text-[11px] text-blue-900 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                💡 <strong>Tip:</strong> Send &quot;Hi&quot; from your phone to <strong>+91 90290 11341</strong> on WhatsApp to unlock the 24-hour custom message window!
               </span>
 
               <button
