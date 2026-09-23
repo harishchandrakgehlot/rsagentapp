@@ -50,13 +50,29 @@ export default function AdminSettingsPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   React.useEffect(() => {
+    try {
+      const localToken = localStorage.getItem('rs_meta_token');
+      if (localToken) {
+        setCustomToken(localToken);
+        setHasSavedToken(true);
+      }
+      const localPhoneId = localStorage.getItem('rs_meta_phone_id');
+      if (localPhoneId) {
+        setPhoneNumberId(localPhoneId);
+        setEditPhoneIdValue(localPhoneId);
+      }
+    } catch {}
+
     fetch('/api/whatsapp/config')
       .then(res => res.json())
       .then(data => {
         if (data.hasToken) setHasSavedToken(true);
         if (data.phoneNumberId) {
-          setPhoneNumberId(data.phoneNumberId);
-          setEditPhoneIdValue(data.phoneNumberId);
+          const localPhoneId = typeof window !== 'undefined' ? localStorage.getItem('rs_meta_phone_id') : null;
+          if (!localPhoneId) {
+            setPhoneNumberId(data.phoneNumberId);
+            setEditPhoneIdValue(data.phoneNumberId);
+          }
         }
         if (data.businessPhone) setBusinessPhone(data.businessPhone);
         if (data.businessAccountId) setBusinessAccountId(data.businessAccountId);
@@ -74,6 +90,9 @@ export default function AdminSettingsPage() {
     if (!customToken.trim()) return;
     setSavingToken(true);
     try {
+      try {
+        localStorage.setItem('rs_meta_token', customToken.trim());
+      } catch {}
       const res = await fetch('/api/whatsapp/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -93,21 +112,26 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const handleSavePhoneId = async () => {
-    if (!editPhoneIdValue.trim()) return;
+  const handleSavePhoneId = async (idOverride?: string) => {
+    const val = (idOverride || editPhoneIdValue).trim();
+    if (!val) return;
     setSavingPhoneId(true);
     try {
+      try {
+        localStorage.setItem('rs_meta_phone_id', val);
+      } catch {}
       const res = await fetch('/api/whatsapp/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumberId: editPhoneIdValue.trim() }),
+        body: JSON.stringify({ phoneNumberId: val }),
       });
       if (res.ok) {
-        setPhoneNumberId(editPhoneIdValue.trim());
+        setPhoneNumberId(val);
+        setEditPhoneIdValue(val);
         setIsEditingPhoneId(false);
         setTestMsgResult({
           success: true,
-          message: `💾 Phone Number ID updated to ${editPhoneIdValue.trim()}!`,
+          message: `💾 Phone Number ID updated to ${val}!`,
         });
       }
     } catch {
@@ -121,8 +145,11 @@ export default function AdminSettingsPage() {
     setFetchingNumbers(true);
     setTestMsgResult(null);
     try {
-      const url = customToken.trim()
-        ? `/api/whatsapp/numbers?token=${encodeURIComponent(customToken.trim())}`
+      const tokenParam =
+        customToken.trim() ||
+        (typeof window !== 'undefined' ? localStorage.getItem('rs_meta_token') || '' : '');
+      const url = tokenParam
+        ? `/api/whatsapp/numbers?token=${encodeURIComponent(tokenParam)}`
         : `/api/whatsapp/numbers`;
       const res = await fetch(url);
       const data = await res.json();
@@ -131,6 +158,9 @@ export default function AdminSettingsPage() {
         if (data.matched) {
           setPhoneNumberId(data.matched.id);
           setEditPhoneIdValue(data.matched.id);
+          try {
+            localStorage.setItem('rs_meta_phone_id', data.matched.id);
+          } catch {}
           setTestMsgResult({
             success: true,
             message: `🎯 Found business number ${data.matched.display_phone_number}! Auto-selected Phone Number ID: ${data.matched.id}`,
@@ -170,12 +200,15 @@ export default function AdminSettingsPage() {
     setTestMsgResult(null);
 
     try {
+      const tokenParam =
+        customToken.trim() ||
+        (typeof window !== 'undefined' ? localStorage.getItem('rs_meta_token') || undefined : undefined);
       const res = await fetch('/api/whatsapp/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipient: testPhone.trim(),
-          token: customToken.trim() || undefined,
+          token: tokenParam,
           phoneNumberId: phoneNumberId.trim() || undefined,
         }),
       });
@@ -351,7 +384,7 @@ export default function AdminSettingsPage() {
                 />
                 <button
                   type="button"
-                  onClick={handleSavePhoneId}
+                  onClick={() => handleSavePhoneId()}
                   disabled={savingPhoneId}
                   className="px-2 py-1 text-[11px] bg-emerald-600 text-white rounded font-medium hover:bg-emerald-700 disabled:opacity-50"
                 >
