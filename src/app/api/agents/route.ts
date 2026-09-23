@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, agent });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error creating agent';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 400 });
   }
 }
 
@@ -50,6 +50,6 @@ export async function PUT(request: Request) {
     return NextResponse.json({ success: true, agent });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error updating agent';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 400 });
   }
 }

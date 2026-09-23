@@ -83,19 +83,26 @@ export function getAgentById(id: string): Agent | undefined {
   return store.agents.find(a => a.id === id);
 }
 
+export function normalizeAgentMobile(mobile: string): string {
+  const digits = mobile.trim().replace(/\D/g, '');
+  if (digits.length < 10) {
+    throw new Error('Valid 10-digit mobile number is required');
+  }
+  return `+91${digits.slice(-10)}`;
+}
+
 export function createAgent(data: { name: string; mobile: string }): Agent {
   const store = getStore();
   const trimmedName = data.name.trim();
-  let cleanMobile = data.mobile.trim();
-  if (!cleanMobile.startsWith('+')) {
-    cleanMobile = cleanMobile.startsWith('91') ? `+${cleanMobile}` : `+91${cleanMobile.replace(/^0+/, '')}`;
+  if (!trimmedName) {
+    throw new Error('Agent name is required');
   }
 
-  const existing = store.agents.find(
-    a => a.mobile === cleanMobile && a.is_active
-  );
+  const cleanMobile = normalizeAgentMobile(data.mobile);
+
+  const existing = store.agents.find(a => a.mobile === cleanMobile);
   if (existing) {
-    return existing;
+    throw new Error('number already entered');
   }
 
   const newAgent: Agent = {
@@ -124,9 +131,27 @@ export function updateAgent(id: string, updates: Partial<Pick<Agent, 'name' | 'm
   if (index === -1) throw new Error('Agent not found');
 
   const prev = store.agents[index];
+  const cleanedUpdates = { ...updates };
+
+  if (cleanedUpdates.mobile) {
+    const cleanMobile = normalizeAgentMobile(cleanedUpdates.mobile);
+    const duplicate = store.agents.find(a => a.id !== id && a.mobile === cleanMobile);
+    if (duplicate) {
+      throw new Error('number already entered');
+    }
+    cleanedUpdates.mobile = cleanMobile;
+  }
+
+  if (cleanedUpdates.name) {
+    cleanedUpdates.name = cleanedUpdates.name.trim();
+    if (!cleanedUpdates.name) {
+      throw new Error('Agent name cannot be empty');
+    }
+  }
+
   const updated: Agent = {
     ...prev,
-    ...updates,
+    ...cleanedUpdates,
     updated_at: new Date().toISOString(),
   };
 
@@ -139,6 +164,115 @@ export function updateAgent(id: string, updates: Partial<Pick<Agent, 'name' | 'm
   });
 
   return updated;
+}
+
+export interface BulkImportAgentInput {
+  name: string;
+  mobile: string;
+}
+
+export interface BulkImportResult {
+  success: boolean;
+  totalRows: number;
+  importedCount: number;
+  skippedCount: number;
+  imported: Agent[];
+  errors: Array<{
+    row: number;
+    name: string;
+    mobile: string;
+    error: string;
+  }>;
+}
+
+export function bulkImportAgents(items: BulkImportAgentInput[]): BulkImportResult {
+  const store = getStore();
+  const imported: Agent[] = [];
+  const errors: BulkImportResult['errors'] = [];
+  const processedNumbersInBatch = new Set<string>();
+
+  items.forEach((item, idx) => {
+    const rowNum = idx + 1;
+    const trimmedName = item.name ? item.name.trim() : '';
+
+    if (!trimmedName) {
+      errors.push({
+        row: rowNum,
+        name: trimmedName || 'N/A',
+        mobile: item.mobile || 'N/A',
+        error: 'Agent name is required',
+      });
+      return;
+    }
+
+    let cleanMobile = '';
+    try {
+      cleanMobile = normalizeAgentMobile(item.mobile || '');
+    } catch {
+      errors.push({
+        row: rowNum,
+        name: trimmedName,
+        mobile: item.mobile || 'N/A',
+        error: 'Invalid 10-digit mobile number',
+      });
+      return;
+    }
+
+    // Check duplicate within the current batch
+    if (processedNumbersInBatch.has(cleanMobile)) {
+      errors.push({
+        row: rowNum,
+        name: trimmedName,
+        mobile: cleanMobile,
+        error: 'number already entered',
+      });
+      return;
+    }
+
+    // Check duplicate in existing database / store
+    const existing = store.agents.find(a => a.mobile === cleanMobile);
+    if (existing) {
+      errors.push({
+        row: rowNum,
+        name: trimmedName,
+        mobile: cleanMobile,
+        error: 'number already entered',
+      });
+      return;
+    }
+
+    // Valid: create agent
+    const newAgent: Agent = {
+      id: `ag-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      name: trimmedName,
+      mobile: cleanMobile,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    store.agents.push(newAgent);
+    imported.push(newAgent);
+    processedNumbersInBatch.add(cleanMobile);
+  });
+
+  if (imported.length > 0) {
+    recordActivityLog({
+      action: 'agent_created',
+      target_type: 'agent',
+      target_id: imported[0].id,
+      summary: `Bulk imported ${imported.length} agent(s) via CSV (${errors.length} skipped/failed).`,
+    });
+  }
+
+  return {
+    success: true,
+    totalRows: items.length,
+    importedCount: imported.length,
+    skippedCount: errors.length,
+    imported,
+    errors,
+  };
 }
 
 export function toggleAgentStatus(id: string): Agent {

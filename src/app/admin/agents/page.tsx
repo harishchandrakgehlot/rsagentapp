@@ -4,11 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { Agent } from '@/types';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { AgentModal } from '@/components/agents/AgentModal';
+import { AgentBulkImportModal } from '@/components/agents/AgentBulkImportModal';
 import { formatReadableISTDateTime } from '@/lib/ist';
 import {
   UserPlus,
   Search,
   Download,
+  Upload,
   Phone,
   CheckCircle2,
   XCircle,
@@ -22,6 +24,7 @@ export default function AdminAgentsPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
 
   const loadAgents = async () => {
@@ -97,13 +100,23 @@ export default function AdminAgentsPage() {
           />
         </div>
 
-        <button
-          onClick={handleExportCSV}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors border border-slate-200 shrink-0"
-        >
-          <Download className="w-3.5 h-3.5 text-amber-600" />
-          <span>Export Agents CSV</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#161E42] hover:bg-[#0A192F] rounded-xl transition-colors border border-slate-700 shadow-xs shrink-0"
+          >
+            <Upload className="w-3.5 h-3.5 text-amber-400" />
+            <span>Import Agents CSV</span>
+          </button>
+
+          <button
+            onClick={handleExportCSV}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors border border-slate-200 shrink-0"
+          >
+            <Download className="w-3.5 h-3.5 text-amber-600" />
+            <span>Export Agents CSV</span>
+          </button>
+        </div>
       </div>
 
       {/* Agents Table */}
@@ -207,6 +220,17 @@ export default function AdminAgentsPage() {
             } else {
               setAgents(prev => [...prev, saved]);
             }
+          }}
+        />
+      )}
+
+      {showImportModal && (
+        <AgentBulkImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          existingAgents={agents}
+          onSuccess={() => {
+            loadAgents();
           }}
         />
       )}

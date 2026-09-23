@@ -14,6 +14,7 @@ import {
   getAgents,
   createAgent,
   updateAgent,
+  bulkImportAgents,
   getProperties,
   findOrCreateProperty,
   getTokens,
@@ -202,6 +203,30 @@ async function runTests() {
   assert(
     retrievedTokenAfterAgentEdit?.agent_mobile_number === '+919111222333',
     'AC 03.3: Editing agent master does NOT alter historical token-specific mobile'
+  );
+
+  // AC 03.4: Duplicate phone number prevention
+  let dupError = '';
+  try {
+    createAgent({ name: 'Duplicate Rohit', mobile: '+919999999999' });
+  } catch (err: unknown) {
+    dupError = err instanceof Error ? err.message : '';
+  }
+  assert(
+    dupError === 'number already entered',
+    'AC 03.4: Rejects duplicate agent mobile with "number already entered"'
+  );
+
+  // AC 03.5: Bulk agent import with duplicate rejection
+  const bulkResult = bulkImportAgents([
+    { name: 'Bulk Associate 1', mobile: '9820555555' },
+    { name: 'Duplicate Associate', mobile: '+919999999999' }, // duplicate of Rohit
+  ]);
+  assert(
+    bulkResult.importedCount === 1 &&
+      bulkResult.skippedCount === 1 &&
+      bulkResult.errors[0]?.error === 'number already entered',
+    'AC 03.5: Bulk CSV agent import registers valid agents and flags duplicate mobile with "number already entered"'
   );
 
   // -------------------------------------------------------------
