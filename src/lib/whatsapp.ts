@@ -60,7 +60,12 @@ export async function sendWhatsAppReminder(
 ): Promise<WhatsAppSendResult> {
   const tokenSecret = process.env.META_WHATSAPP_TOKEN;
   const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1281001591773327';
-  const recipient = token.agent_mobile_number.replace(/\D/g, ''); // E.164 digits without +
+  let recipient = token.agent_mobile_number.replace(/\D/g, ''); // E.164 digits without +
+  if (recipient.length === 10) {
+    recipient = `91${recipient}`;
+  } else if (recipient.length === 11 && recipient.startsWith('0')) {
+    recipient = `91${recipient.slice(1)}`;
+  }
 
   const messageText = buildReminderMessageText(token, reminderType);
 
@@ -137,7 +142,12 @@ export async function sendDirectWhatsAppMessage({
 }): Promise<WhatsAppSendResult & { rawResponse?: unknown }> {
   const tokenSecret = token || process.env.META_WHATSAPP_TOKEN;
   const phoneId = phoneNumberId || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1281001591773327';
-  const recipient = to.replace(/\D/g, '');
+  let recipient = to.replace(/\D/g, '');
+  if (recipient.length === 10) {
+    recipient = `91${recipient}`;
+  } else if (recipient.length === 11 && recipient.startsWith('0')) {
+    recipient = `91${recipient.slice(1)}`;
+  }
 
   if (!tokenSecret) {
     return {
@@ -147,7 +157,8 @@ export async function sendDirectWhatsAppMessage({
   }
 
   try {
-    const response = await fetch(
+    // Attempt sending as text message first
+    let response = await fetch(
       `https://graph.facebook.com/v22.0/${phoneId}/messages`,
       {
         method: 'POST',
@@ -168,13 +179,38 @@ export async function sendDirectWhatsAppMessage({
       }
     );
 
-    const data = await response.json();
+    let data = await response.json();
+
+    // If Meta rejects freeform text because a template is required outside the 24-hour window,
+    // fallback to Meta's standard pre-approved "hello_world" template
+    if (!response.ok && data.error?.code === 131047) {
+      response = await fetch(
+        `https://graph.facebook.com/v22.0/${phoneId}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenSecret}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: recipient,
+            type: 'template',
+            template: {
+              name: 'hello_world',
+              language: { code: 'en_US' },
+            },
+          }),
+        }
+      );
+      data = await response.json();
+    }
 
     if (!response.ok) {
       return {
         success: false,
         error: data.error?.message || `HTTP ${response.status} from Meta API`,
-        rawResponse: data,
+        rawResponse: { ...data, attemptedRecipient: recipient },
       };
     }
 
