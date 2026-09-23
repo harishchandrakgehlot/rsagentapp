@@ -59,7 +59,7 @@ export async function sendWhatsAppReminder(
   reminderType: ReminderType
 ): Promise<WhatsAppSendResult> {
   const tokenSecret = process.env.META_WHATSAPP_TOKEN;
-  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
+  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1281001591773327';
   const recipient = token.agent_mobile_number.replace(/\D/g, ''); // E.164 digits without +
 
   const messageText = buildReminderMessageText(token, reminderType);
@@ -68,7 +68,7 @@ export async function sendWhatsAppReminder(
   if (tokenSecret && phoneNumberId) {
     try {
       const response = await fetch(
-        `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`,
+        `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`,
         {
           method: 'POST',
           headers: {
@@ -119,4 +119,77 @@ export async function sendWhatsAppReminder(
     providerId: mockMsgId,
     simulated: true,
   };
+}
+
+/**
+ * Direct message sender used for testing WhatsApp integration from Settings.
+ */
+export async function sendDirectWhatsAppMessage({
+  to,
+  body,
+  token,
+  phoneNumberId,
+}: {
+  to: string;
+  body: string;
+  token?: string;
+  phoneNumberId?: string;
+}): Promise<WhatsAppSendResult & { rawResponse?: unknown }> {
+  const tokenSecret = token || process.env.META_WHATSAPP_TOKEN;
+  const phoneId = phoneNumberId || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1281001591773327';
+  const recipient = to.replace(/\D/g, '');
+
+  if (!tokenSecret) {
+    return {
+      success: false,
+      error: 'Meta WhatsApp Access Token is missing. Click "Generate token" in Meta and enter it.',
+    };
+  }
+
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v22.0/${phoneId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenSecret}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: recipient,
+          type: 'text',
+          text: {
+            preview_url: true,
+            body,
+          },
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error?.message || `HTTP ${response.status} from Meta API`,
+        rawResponse: data,
+      };
+    }
+
+    const msgId = data.messages?.[0]?.id || `wamid.${Date.now()}`;
+    return {
+      success: true,
+      providerId: msgId,
+      simulated: false,
+      rawResponse: data,
+    };
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : 'Network error communicating with Meta API';
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
 }
