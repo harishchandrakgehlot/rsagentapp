@@ -30,7 +30,7 @@ export default function AdminSettingsPage() {
   const [phoneNumberId, setPhoneNumberId] = useState('1281001591773327');
   const [editPhoneIdValue, setEditPhoneIdValue] = useState('1281001591773327');
   const [isEditingPhoneId, setIsEditingPhoneId] = useState(false);
-  const [businessPhone, setBusinessPhone] = useState('919029011341');
+  const [businessPhone, setBusinessPhone] = useState('919819143222');
   const [businessAccountId, setBusinessAccountId] = useState('1112101401393002');
   const [hasSavedToken, setHasSavedToken] = useState(false);
   const [savingToken, setSavingToken] = useState(false);
@@ -174,7 +174,7 @@ export default function AdminSettingsPage() {
         } else {
           setTestMsgResult({
             success: false,
-            message: `No phone numbers registered in Meta under WABA ID ${businessAccountId} yet. Follow the steps below to add +91 90290 11341 in Meta.`,
+            message: `No phone numbers registered in Meta under WABA ID ${businessAccountId} yet. Follow the steps below to add +91 98191 43222 in Meta.`,
           });
         }
       } else {
@@ -490,21 +490,21 @@ export default function AdminSettingsPage() {
           </div>
         )}
 
-        {/* Guide for 919029011341 */}
+        {/* Guide for 9819143222 */}
         <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2 text-xs">
           <p className="font-bold text-amber-950 flex items-center gap-1.5">
             <Phone className="w-4 h-4 text-amber-700" />
-            <span>How to Link +91 90290 11341 in Meta Developer Console</span>
+            <span>How to Link +91 98191 43222 in Meta Developer Console</span>
           </p>
           <div className="space-y-1.5 text-amber-900 text-[11px] leading-relaxed">
             <p>
               1. Open your <strong>Meta App Dashboard &gt; WhatsApp &gt; API Setup</strong>.
             </p>
             <p>
-              2. Scroll down to <strong>Step 5: Add a phone number</strong>, click <strong>Add phone number</strong>, and enter display name <em>Royal Services</em> and number <em>90290 11341</em>.
+              2. Scroll down to <strong>Step 5: Add a phone number</strong>, click <strong>Add phone number</strong>, and enter display name <em>Royal Services</em> and number <em>98191 43222</em>.
             </p>
             <p>
-              3. Verify the OTP sent to your phone. Once added, go back to <strong>Step 1</strong> at the top, select <strong>+91 90290 11341</strong> from the <em>From</em> dropdown.
+              3. Verify the OTP sent to your phone. Once added, go back to <strong>Step 1</strong> at the top, select <strong>+91 98191 43222</strong> from the <em>From</em> dropdown.
             </p>
             <p>
               4. Meta will display your new <strong>Phone number ID</strong>. Paste it above or click <strong>Auto-Detect Phone Numbers</strong> to sync it automatically!
@@ -649,7 +649,7 @@ export default function AdminSettingsPage() {
                       Custom Text Notification
                     </span>
                     <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
-                      Delivers only if recipient sent a message to +91 90290 11341 in the last 24 hours.
+                      Delivers only if recipient sent a message to +91 98191 43222 in the last 24 hours.
                     </span>
                   </div>
                 </label>
@@ -658,7 +658,7 @@ export default function AdminSettingsPage() {
 
             <div className="flex items-center justify-between pt-1">
               <span className="text-[11px] text-blue-900 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
-                💡 <strong>Tip:</strong> Send &quot;Hi&quot; from your phone to <strong>+91 90290 11341</strong> on WhatsApp to unlock the 24-hour custom message window!
+                💡 <strong>Tip:</strong> Send &quot;Hi&quot; from your phone to <strong>+91 98191 43222</strong> on WhatsApp to unlock the 24-hour custom message window!
               </span>
 
               <button

@@ -52,15 +52,16 @@ export async function GET(request: Request) {
       code_verification_status?: string;
     }> = data.data || [];
 
+    const targetPhone = config.businessPhone?.replace(/\D/g, '') || '919819143222';
     const matchedNumber = numbers.find(n => {
       const clean = (n.display_phone_number || '').replace(/\D/g, '');
-      return clean.includes('9029011341') || clean === '919029011341';
+      return clean.includes('9819143222') || clean.includes(targetPhone.slice(-10));
     });
 
     if (matchedNumber) {
       setWhatsAppConfig({
         phoneNumberId: matchedNumber.id,
-        businessPhone: matchedNumber.display_phone_number?.replace(/\D/g, '') || '919029011341',
+        businessPhone: matchedNumber.display_phone_number?.replace(/\D/g, '') || '919819143222',
       });
     }
 

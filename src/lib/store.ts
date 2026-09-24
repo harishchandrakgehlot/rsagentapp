@@ -74,7 +74,7 @@ export interface WhatsAppIntegrationConfig {
 }
 
 const storedWhatsAppConfig: Partial<WhatsAppIntegrationConfig> = {
-  businessPhone: process.env.META_WHATSAPP_BUSINESS_PHONE || '919029011341',
+  businessPhone: process.env.META_WHATSAPP_BUSINESS_PHONE || '919819143222',
   phoneNumberId: process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1281001591773327',
   businessAccountId: process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID || '1112101401393002',
 };
@@ -91,7 +91,7 @@ export function getWhatsAppConfig(): WhatsAppIntegrationConfig {
     token: storedWhatsAppConfig.token || process.env.META_WHATSAPP_TOKEN || '',
     phoneNumberId: storedWhatsAppConfig.phoneNumberId || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1281001591773327',
     businessAccountId: storedWhatsAppConfig.businessAccountId || process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID || '1112101401393002',
-    businessPhone: storedWhatsAppConfig.businessPhone || process.env.META_WHATSAPP_BUSINESS_PHONE || '919029011341',
+    businessPhone: storedWhatsAppConfig.businessPhone || process.env.META_WHATSAPP_BUSINESS_PHONE || '919819143222',
   };
 }
 
