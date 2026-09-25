@@ -2,7 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AdminHeader } from '@/components/layout/AdminHeader';
+
+
 import { DashboardMetrics, Token, ActivityLog } from '@/types';
 import { TokenStatusBadge } from '@/components/tokens/TokenStatusBadge';
 import { formatReadableISTDate, formatReadableISTDateTime } from '@/lib/ist';
@@ -23,6 +26,7 @@ import {
 
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentTokens, setRecentTokens] = useState<Token[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
@@ -35,6 +39,10 @@ export default function AdminDashboardPage() {
     setFetchError(false);
     try {
       const res = await fetch('/api/dashboard');
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         setMetrics(data.metrics);
@@ -55,6 +63,11 @@ export default function AdminDashboardPage() {
     (async () => {
       try {
         const res = await fetch('/api/dashboard');
+        if (res.status === 401) {
+          router.push('/admin/login');
+          return;
+        }
+
         if (res.ok) {
           const data = await res.json();
           if (!ignore) {
@@ -78,7 +91,10 @@ export default function AdminDashboardPage() {
     return () => {
       ignore = true;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+
 
 
   const handleRunReminders = async () => {

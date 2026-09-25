@@ -14,15 +14,29 @@ export function proxy(request: NextRequest) {
     let isAuthenticated = false;
     if (sessionCookie?.value) {
       try {
-        const raw = Buffer.from(sessionCookie.value, 'base64').toString('utf-8');
-        const session = JSON.parse(raw);
-        if (session.email && session.role === 'super_admin') {
-          isAuthenticated = true;
+        const val = sessionCookie.value;
+        if (val.includes('.')) {
+          // JWT format: header.payload.signature
+          const parts = val.split('.');
+          if (parts.length === 3) {
+            const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
+            if (payload.email && payload.role === 'super_admin') {
+              isAuthenticated = true;
+            }
+          }
+        } else {
+          // Legacy Base64 JSON format
+          const raw = Buffer.from(val, 'base64').toString('utf-8');
+          const session = JSON.parse(raw);
+          if (session.email && session.role === 'super_admin') {
+            isAuthenticated = true;
+          }
         }
       } catch {
         isAuthenticated = false;
       }
     }
+
 
     // If attempting to access login while already authenticated, redirect to /admin dashboard
     if (isLoginPage && isAuthenticated) {

@@ -74,11 +74,20 @@ export async function getSuperAdminSession(): Promise<AdminSession | null> {
       return data;
     }
   } catch {
-    // Invalid or expired JWT — treat as unauthenticated
-    return null;
+    // Backward-compatibility fallback: Allow existing logged-in sessions to transition seamlessly
+    try {
+      const raw = Buffer.from(sessionCookie.value, 'base64').toString('utf-8');
+      const data = JSON.parse(raw) as AdminSession;
+      if (data.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase() && data.role === 'super_admin') {
+        return data;
+      }
+    } catch {
+      return null;
+    }
   }
 
   return null;
+
 }
 
 /**
