@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       message ||
       `*Royal Services - Meta WhatsApp Cloud API Test*\n\n` +
       `✅ Success! Your Meta WhatsApp Cloud API connection is active and configured.\n\n` +
-      `• *Phone Number ID:* ${phoneNumberId || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1281001591773327'}\n` +
+      `• *Phone Number ID:* ${phoneNumberId || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1387005294491815'}\n` +
       `• *Time:* ${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST\n\n` +
       `_Royal Services Automated Messaging Engine_`;
 
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       body: isTemplate ? undefined : testBody,
       token,
       phoneNumberId,
-      templateName: isTemplate ? 'hello_world' : undefined,
+      templateName: isTemplate ? '3p_direct_integration_test_template' : undefined,
     });
 
     if (!result.success) {
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       providerId: result.providerId,
       sentAs: result.sentAs,
       message: isTemplate
-        ? 'Official verified "hello_world" template delivered successfully via Meta!'
+        ? 'Official verified template ("3p_direct_integration_test_template") delivered successfully via Meta!'
         : 'Custom test message successfully dispatched via Meta WhatsApp API!',
       raw: result.rawResponse,
     });

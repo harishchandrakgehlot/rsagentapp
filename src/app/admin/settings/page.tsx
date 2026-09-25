@@ -27,8 +27,8 @@ export default function AdminSettingsPage() {
   const [testPhone, setTestPhone] = useState('');
   const [customToken, setCustomToken] = useState('');
   const [testMode, setTestMode] = useState<'template' | 'custom'>('template');
-  const [phoneNumberId, setPhoneNumberId] = useState('1281001591773327');
-  const [editPhoneIdValue, setEditPhoneIdValue] = useState('1281001591773327');
+  const [phoneNumberId, setPhoneNumberId] = useState('1387005294491815');
+  const [editPhoneIdValue, setEditPhoneIdValue] = useState('1387005294491815');
   const [isEditingPhoneId, setIsEditingPhoneId] = useState(false);
   const [businessPhone, setBusinessPhone] = useState('919819143222');
   const [businessAccountId, setBusinessAccountId] = useState('2150898739182078');
@@ -621,7 +621,7 @@ export default function AdminSettingsPage() {
                   <div>
                     <span className="font-bold block text-[11px] text-emerald-900 flex items-center gap-1">
                       <Sparkles className="w-3 h-3 text-emerald-600" />
-                      Verified Template (&quot;hello_world&quot;)
+                      Verified Template (&quot;3p_direct_integration_test_template&quot;)
                     </span>
                     <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
                       Guaranteed instant delivery anytime. Bypasses 24-hour window restriction.

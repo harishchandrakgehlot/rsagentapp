@@ -2,6 +2,8 @@ import { Token, ReminderType } from '@/types';
 import { formatReadableISTDate } from './ist';
 import { getWhatsAppToken, getWhatsAppPhoneNumberId } from './store';
 
+const GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION || 'v25.0';
+
 export interface WhatsAppSendResult {
   success: boolean;
   providerId?: string;
@@ -74,7 +76,7 @@ export async function sendWhatsAppReminder(
   if (tokenSecret && phoneNumberId) {
     try {
       const response = await fetch(
-        `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`,
+        `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
         {
           method: 'POST',
           headers: {
@@ -183,7 +185,7 @@ export async function sendDirectWhatsAppMessage({
         };
 
     let response = await fetch(
-      `https://graph.facebook.com/v22.0/${phoneId}/messages`,
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneId}/messages`,
       {
         method: 'POST',
         headers: {
@@ -200,7 +202,7 @@ export async function sendDirectWhatsAppMessage({
     if (!response.ok && data.error?.code === 131047 && !templateName) {
       sentAs = 'template';
       response = await fetch(
-        `https://graph.facebook.com/v22.0/${phoneId}/messages`,
+        `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneId}/messages`,
         {
           method: 'POST',
           headers: {
@@ -212,13 +214,37 @@ export async function sendDirectWhatsAppMessage({
             to: recipient,
             type: 'template',
             template: {
-              name: 'hello_world',
+              name: '3p_direct_integration_test_template',
               language: { code: 'en_US' },
             },
           }),
         }
       );
       data = await response.json();
+
+      // If 3p template not found, try hello_world
+      if (!response.ok && data.error?.code === 132001) {
+        response = await fetch(
+          `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneId}/messages`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${tokenSecret}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              to: recipient,
+              type: 'template',
+              template: {
+                name: 'hello_world',
+                language: { code: 'en_US' },
+              },
+            }),
+          }
+        );
+        data = await response.json();
+      }
     }
 
     if (!response.ok) {

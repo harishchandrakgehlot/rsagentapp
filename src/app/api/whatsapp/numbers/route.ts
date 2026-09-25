@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     }
 
     const response = await fetch(
-      `https://graph.facebook.com/v22.0/${wabaId}/phone_numbers`,
+      `https://graph.facebook.com/v25.0/${wabaId}/phone_numbers`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
