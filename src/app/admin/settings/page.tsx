@@ -43,6 +43,15 @@ export default function AdminSettingsPage() {
     verified_name?: string;
     quality_rating?: string;
   }> | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState('hello_world');
+  const [selectedTemplateLang, setSelectedTemplateLang] = useState('en_US');
+  const [fetchingTemplates, setFetchingTemplates] = useState(false);
+  const [detectedTemplates, setDetectedTemplates] = useState<Array<{
+    name: string;
+    language: string;
+    status: string;
+    category?: string;
+  }> | null>(null);
   const [testMsgResult, setTestMsgResult] = useState<{
     success: boolean;
     message: string;
@@ -193,6 +202,47 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const handleFetchTemplates = async () => {
+    setFetchingTemplates(true);
+    setTestMsgResult(null);
+    try {
+      const tokenParam =
+        customToken.trim() ||
+        (typeof window !== 'undefined' ? localStorage.getItem('rs_meta_token') || '' : '');
+      const url = tokenParam
+        ? `/api/whatsapp/templates?token=${encodeURIComponent(tokenParam)}&wabaId=${businessAccountId}`
+        : `/api/whatsapp/templates?wabaId=${businessAccountId}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.templates)) {
+        setDetectedTemplates(data.templates);
+        if (data.templates.length > 0) {
+          setTestMsgResult({
+            success: true,
+            message: `📋 Loaded ${data.templates.length} template(s) from Meta! Click any template below to select it.`,
+          });
+        } else {
+          setTestMsgResult({
+            success: false,
+            message: `No custom templates registered in Meta WABA yet. Using Meta's built-in default "hello_world".`,
+          });
+        }
+      } else {
+        setTestMsgResult({
+          success: false,
+          message: data.error || 'Could not fetch templates from Meta.',
+        });
+      }
+    } catch (e: unknown) {
+      setTestMsgResult({
+        success: false,
+        message: e instanceof Error ? e.message : 'Error querying Meta templates',
+      });
+    } finally {
+      setFetchingTemplates(false);
+    }
+  };
+
   const handleSendTestMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!testPhone.trim()) return;
@@ -212,6 +262,8 @@ export default function AdminSettingsPage() {
           token: tokenParam,
           phoneNumberId: phoneNumberId.trim() || undefined,
           mode: testMode,
+          templateName: selectedTemplate,
+          templateLanguage: selectedTemplateLang,
         }),
       });
 
@@ -598,7 +650,7 @@ export default function AdminSettingsPage() {
             </div>
 
             {/* Message Delivery Mode Selection */}
-            <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
+            <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-3">
               <span className="text-[11px] font-semibold text-slate-700 uppercase block">
                 Select Message Format:
               </span>
@@ -621,10 +673,10 @@ export default function AdminSettingsPage() {
                   <div>
                     <span className="font-bold block text-[11px] text-emerald-900 flex items-center gap-1">
                       <Sparkles className="w-3 h-3 text-emerald-600" />
-                      Verified Template (&quot;3p_direct_integration_test_template&quot;)
+                      Verified Template (Bypasses 24-hr limit)
                     </span>
                     <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
-                      Guaranteed instant delivery anytime. Bypasses 24-hour window restriction.
+                      Guaranteed instant delivery anytime, even without an active conversation window.
                     </span>
                   </div>
                 </label>
@@ -654,6 +706,77 @@ export default function AdminSettingsPage() {
                   </div>
                 </label>
               </div>
+
+              {testMode === 'template' && (
+                <div className="pt-2 border-t border-slate-100 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-slate-600 uppercase">
+                      Select Template to Dispatch:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleFetchTemplates}
+                      disabled={fetchingTemplates}
+                      className="text-[10px] text-indigo-700 hover:text-indigo-900 font-semibold inline-flex items-center gap-1 hover:underline"
+                    >
+                      <RefreshCw className={`w-2.5 h-2.5 ${fetchingTemplates ? 'animate-spin' : ''}`} />
+                      <span>{fetchingTemplates ? 'Fetching from Meta...' : 'Fetch Templates from Meta'}</span>
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplate('hello_world');
+                        setSelectedTemplateLang('en_US');
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                        selectedTemplate === 'hello_world'
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      hello_world (en_US) ★ Meta Default
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplate('3p_direct_integration_test_template');
+                        setSelectedTemplateLang('en_US');
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                        selectedTemplate === '3p_direct_integration_test_template'
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      3p_direct_integration_test_template
+                    </button>
+                    {detectedTemplates?.map(t => (
+                      <button
+                        key={`${t.name}_${t.language}`}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTemplate(t.name);
+                          setSelectedTemplateLang(t.language);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                          selectedTemplate === t.name
+                            ? 'bg-emerald-700 text-white shadow-xs'
+                            : 'bg-indigo-50 text-indigo-800 border border-indigo-200 hover:bg-indigo-100'
+                        }`}
+                      >
+                        {t.name} ({t.language}) {t.status === 'APPROVED' ? '✓' : ''}
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="text-[10px] text-emerald-800 bg-emerald-50/80 p-2 rounded-lg border border-emerald-200 leading-tight">
+                    ✨ <strong>Auto-Fallback Active:</strong> If <em>&quot;{selectedTemplate}&quot;</em> fails with code 132001 in Meta, the app automatically falls back to <code>hello_world (en_US)</code> so your test message is delivered immediately!
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-1">

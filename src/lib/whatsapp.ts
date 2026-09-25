@@ -138,13 +138,21 @@ export async function sendDirectWhatsAppMessage({
   token,
   phoneNumberId,
   templateName,
+  templateLanguage = 'en_US',
 }: {
   to: string;
   body?: string;
   token?: string;
   phoneNumberId?: string;
   templateName?: string;
-}): Promise<WhatsAppSendResult & { rawResponse?: unknown; sentAs?: 'template' | 'text' }> {
+  templateLanguage?: string;
+}): Promise<
+  WhatsAppSendResult & {
+    rawResponse?: unknown;
+    sentAs?: 'template' | 'text';
+    deliveredTemplate?: string;
+  }
+> {
   const tokenSecret = token || getWhatsAppToken();
   const phoneId = phoneNumberId || getWhatsAppPhoneNumberId();
   let recipient = to.replace(/\D/g, '');
@@ -163,45 +171,11 @@ export async function sendDirectWhatsAppMessage({
 
   try {
     let sentAs: 'template' | 'text' = templateName ? 'template' : 'text';
-    const payload = templateName
-      ? {
-          messaging_product: 'whatsapp',
-          to: recipient,
-          type: 'template',
-          template: {
-            name: templateName,
-            language: { code: 'en_US' },
-          },
-        }
-      : {
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: recipient,
-          type: 'text',
-          text: {
-            preview_url: true,
-            body: body || 'Hello from Royal Services!',
-          },
-        };
+    let deliveredTemplate: string | undefined;
 
-    let response = await fetch(
-      `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${tokenSecret}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-
-    let data = await response.json();
-
-    // If text message fails outside 24h window (code 131047), fallback to template
-    if (!response.ok && data.error?.code === 131047 && !templateName) {
-      sentAs = 'template';
-      response = await fetch(
+    // Helper to send a template with given name and language
+    const postTemplate = async (name: string, lang: string) => {
+      const res = await fetch(
         `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneId}/messages`,
         {
           method: 'POST',
@@ -214,43 +188,94 @@ export async function sendDirectWhatsAppMessage({
             to: recipient,
             type: 'template',
             template: {
-              name: '3p_direct_integration_test_template',
-              language: { code: 'en_US' },
+              name,
+              language: { code: lang },
+            },
+          }),
+        }
+      );
+      const json = await res.json();
+      return { response: res, data: json };
+    };
+
+    let response: Response;
+    let data: any;
+
+    if (!templateName) {
+      // Send as free-form text first
+      response = await fetch(
+        `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneId}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${tokenSecret}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: recipient,
+            type: 'text',
+            text: {
+              preview_url: true,
+              body: body || 'Hello from Royal Services!',
             },
           }),
         }
       );
       data = await response.json();
 
-      // If 3p template not found, try hello_world
-      if (!response.ok && data.error?.code === 132001) {
-        response = await fetch(
-          `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneId}/messages`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${tokenSecret}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              messaging_product: 'whatsapp',
-              to: recipient,
-              type: 'template',
-              template: {
-                name: 'hello_world',
-                language: { code: 'en_US' },
-              },
-            }),
-          }
-        );
-        data = await response.json();
+      // If text message fails outside 24h window (code 131047), fall back to template cascade
+      if (!response.ok && data.error?.code === 131047) {
+        sentAs = 'template';
+        templateName = 'hello_world';
       }
     }
 
-    if (!response.ok) {
+    // If template requested or text fell back to template
+    if (templateName) {
+      sentAs = 'template';
+      const rawCandidates = [
+        { name: templateName, lang: templateLanguage },
+        { name: templateName, lang: templateLanguage === 'en_US' ? 'en' : 'en_US' },
+        { name: 'hello_world', lang: 'en_US' },
+        { name: 'hello_world', lang: 'en' },
+        { name: '3p_direct_integration_test_template', lang: 'en' },
+        { name: '3p_direct_integration_test_template', lang: 'en_US' },
+      ];
+
+      // Remove duplicates preserving order
+      const candidates = rawCandidates.filter(
+        (c, idx, arr) => idx === arr.findIndex(x => x.name === c.name && x.lang === c.lang)
+      );
+
+      let lastErrorData = null;
+      for (const cand of candidates) {
+        const result = await postTemplate(cand.name, cand.lang);
+        response = result.response;
+        data = result.data;
+
+        if (response.ok && !data.error) {
+          deliveredTemplate = `${cand.name} (${cand.lang})`;
+          break;
+        }
+
+        lastErrorData = data;
+        // If error is NOT missing template translation (code 132001), stop immediately (e.g. invalid phone, bad token, payment issue)
+        if (data.error?.code !== 132001) {
+          break;
+        }
+      }
+
+      if (!response!.ok && lastErrorData) {
+        data = lastErrorData;
+      }
+    }
+
+    if (!response!.ok) {
       return {
         success: false,
-        error: data.error?.message || `HTTP ${response.status} from Meta API`,
+        error: data.error?.message || `HTTP ${response!.status} from Meta API`,
         rawResponse: { ...data, attemptedRecipient: recipient },
       };
     }
@@ -260,6 +285,7 @@ export async function sendDirectWhatsAppMessage({
       success: true,
       providerId: msgId,
       sentAs,
+      deliveredTemplate,
       simulated: false,
       rawResponse: data,
     };

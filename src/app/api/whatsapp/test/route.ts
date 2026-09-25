@@ -9,7 +9,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { recipient, message, token, phoneNumberId, mode } = await request.json();
+    const {
+      recipient,
+      message,
+      token,
+      phoneNumberId,
+      mode,
+      templateName,
+      templateLanguage,
+    } = await request.json();
 
     if (!recipient) {
       return NextResponse.json(
@@ -32,7 +40,8 @@ export async function POST(request: Request) {
       body: isTemplate ? undefined : testBody,
       token,
       phoneNumberId,
-      templateName: isTemplate ? '3p_direct_integration_test_template' : undefined,
+      templateName: isTemplate ? (templateName || 'hello_world') : undefined,
+      templateLanguage: templateLanguage || 'en_US',
     });
 
     if (!result.success) {
@@ -42,12 +51,14 @@ export async function POST(request: Request) {
       );
     }
 
+    const deliveredName = result.deliveredTemplate || templateName || 'hello_world';
     return NextResponse.json({
       success: true,
       providerId: result.providerId,
       sentAs: result.sentAs,
+      deliveredTemplate: result.deliveredTemplate,
       message: isTemplate
-        ? 'Official verified template ("3p_direct_integration_test_template") delivered successfully via Meta!'
+        ? `Official verified template ("${deliveredName}") delivered successfully via Meta!`
         : 'Custom test message successfully dispatched via Meta WhatsApp API!',
       raw: result.rawResponse,
     });
