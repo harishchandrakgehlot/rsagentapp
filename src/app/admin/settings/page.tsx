@@ -279,6 +279,50 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const [creatingTemplate, setCreatingTemplate] = useState(false);
+
+  const handleCreateTemplate = async () => {
+    setCreatingTemplate(true);
+    setTestMsgResult(null);
+    try {
+      const tokenParam = (
+        customToken.trim() ||
+        (typeof window !== 'undefined' ? localStorage.getItem('rs_meta_token') || '' : '')
+      ).trim();
+      const res = await fetch('/api/whatsapp/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: tokenParam || undefined,
+          wabaId: businessAccountId,
+          name: 'royal_services_notification',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSelectedTemplate('royal_services_notification');
+        setSelectedTemplateLang('en_US');
+        setTestMsgResult({
+          success: true,
+          message: `🎉 ${data.message} Ready to send!`,
+        });
+        handleFetchTemplates();
+      } else {
+        setTestMsgResult({
+          success: false,
+          message: data.error || 'Failed to create template in Meta.',
+        });
+      }
+    } catch (e: unknown) {
+      setTestMsgResult({
+        success: false,
+        message: e instanceof Error ? e.message : 'Error creating template in Meta',
+      });
+    } finally {
+      setCreatingTemplate(false);
+    }
+  };
+
   const handleSendTestMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!testPhone.trim()) return;
@@ -790,50 +834,48 @@ export default function AdminSettingsPage() {
               </div>
 
               {testMode === 'template' && (
-                <div className="pt-2 border-t border-slate-100 space-y-2">
-                  <div className="flex items-center justify-between">
+                <div className="pt-2 border-t border-slate-100 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5">
                     <span className="text-[10px] font-semibold text-slate-600 uppercase">
-                      Select Template to Dispatch:
+                      Select Production Template to Dispatch:
                     </span>
-                    <button
-                      type="button"
-                      onClick={handleFetchTemplates}
-                      disabled={fetchingTemplates}
-                      className="text-[10px] text-indigo-700 hover:text-indigo-900 font-semibold inline-flex items-center gap-1 hover:underline"
-                    >
-                      <RefreshCw className={`w-2.5 h-2.5 ${fetchingTemplates ? 'animate-spin' : ''}`} />
-                      <span>{fetchingTemplates ? 'Fetching from Meta...' : 'Fetch Templates from Meta'}</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCreateTemplate}
+                        disabled={creatingTemplate}
+                        className="text-[10px] bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 font-semibold px-2 py-0.5 rounded-lg inline-flex items-center gap-1 transition-colors disabled:opacity-50"
+                        title="Register official production template in Meta with 1-click"
+                      >
+                        <Sparkles className={`w-2.5 h-2.5 text-emerald-700 ${creatingTemplate ? 'animate-spin' : ''}`} />
+                        <span>{creatingTemplate ? 'Registering...' : '✨ Register Template in Meta'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleFetchTemplates}
+                        disabled={fetchingTemplates}
+                        className="text-[10px] text-indigo-700 hover:text-indigo-900 font-semibold inline-flex items-center gap-1 hover:underline"
+                      >
+                        <RefreshCw className={`w-2.5 h-2.5 ${fetchingTemplates ? 'animate-spin' : ''}`} />
+                        <span>{fetchingTemplates ? 'Scanning...' : 'Fetch Templates from Meta'}</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-1.5">
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedTemplate('hello_world');
+                        setSelectedTemplate('royal_services_notification');
                         setSelectedTemplateLang('en_US');
                       }}
                       className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-                        selectedTemplate === 'hello_world'
+                        selectedTemplate === 'royal_services_notification'
                           ? 'bg-emerald-700 text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          : 'bg-emerald-50 text-emerald-900 border border-emerald-200 hover:bg-emerald-100'
                       }`}
                     >
-                      hello_world (en_US) ★ Meta Default
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedTemplate('3p_direct_integration_test_template');
-                        setSelectedTemplateLang('en_US');
-                      }}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-                        selectedTemplate === '3p_direct_integration_test_template'
-                          ? 'bg-emerald-700 text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      3p_direct_integration_test_template
+                      royal_services_notification (en_US) ★ Production
                     </button>
                     {detectedTemplates?.map(t => (
                       <button
@@ -854,8 +896,8 @@ export default function AdminSettingsPage() {
                     ))}
                   </div>
 
-                  <p className="text-[10px] text-emerald-800 bg-emerald-50/80 p-2 rounded-lg border border-emerald-200 leading-tight">
-                    ✨ <strong>Auto-Fallback Active:</strong> If <em>&quot;{selectedTemplate}&quot;</em> fails with code 132001 in Meta, the app automatically falls back to <code>hello_world (en_US)</code> so your test message is delivered immediately!
+                  <p className="text-[10px] text-amber-900 bg-amber-50/90 p-2 rounded-lg border border-amber-200 leading-tight">
+                    ℹ️ <strong>Meta Production Rule:</strong> The built-in <code>hello_world</code> template is only allowed on test/sandbox numbers. For your live number (<strong>+91 98191 43222</strong>), click <strong>✨ Register Template in Meta</strong> above, or use <strong>Custom Text Notification</strong> (by texting &quot;Hi&quot; to +91 98191 43222 first)!
                   </p>
                 </div>
               )}

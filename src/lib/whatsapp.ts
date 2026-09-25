@@ -286,9 +286,13 @@ export async function sendDirectWhatsAppMessage({
     }
 
     if (!response!.ok) {
+      let customError = data.error?.message || `HTTP ${response!.status} from Meta API`;
+      if (data.error?.code === 131058) {
+        customError = `Meta Restriction (#131058): The "hello_world" template can only be sent from Meta sandbox numbers (+1 555...). Since +91 98191 43222 is an official live business number, select "Custom Text Notification" (after sending "Hi" to +91 98191 43222 from your phone) or click "Register Production Template" to create an approved template.`;
+      }
       return {
         success: false,
-        error: data.error?.message || `HTTP ${response!.status} from Meta API`,
+        error: customError,
         rawResponse: { ...data, attemptedRecipient: recipient },
       };
     }
