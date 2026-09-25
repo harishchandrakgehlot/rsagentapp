@@ -32,7 +32,7 @@ import {
   clearStore,
 } from '../src/lib/store';
 import { generateTokenCSV, generateAgentCSV, sanitizeCSVValue } from '../src/lib/export';
-import { buildReminderMessageText } from '../src/lib/whatsapp';
+import { buildReminderMessageText, sendWhatsAppReminder } from '../src/lib/whatsapp';
 
 let passedTests = 0;
 let totalTests = 0;
@@ -366,6 +366,33 @@ async function runTests() {
     messageBody.includes(renewedToken.property?.name || '') &&
     messageBody.includes('/track/'),
     'AC 11.5: Reminder message includes token number, property, dates, and public tracking link'
+  );
+
+  // AC 11.6: Token with multiple Assigned Agents & WhatsApp Recipients
+  const multiRecipientToken = createToken({
+    token_number: 'RS-MULTI-REC-001',
+    associate_name: 'Multi Recipient Client Ltd',
+    agent_id: createdAgent.id,
+    agent_mobile_number: '+919820111111',
+    assigned_recipients: [
+      { name: 'Rohit Verma', mobile: '+919820111111', is_primary: true },
+      { name: 'Priya Sharma (Co-Agent)', mobile: '+919820222222', is_primary: false },
+      { name: 'Vikram Mehta (Supervisor)', mobile: '+919820333333', is_primary: false },
+    ],
+    property_id: 'pr-001',
+    start_date: '2026-09-01',
+    end_date: '2026-10-30',
+  });
+
+  assert(
+    multiRecipientToken.assigned_recipients?.length === 3,
+    'AC 11.6: Token successfully stores multiple assigned agents & WhatsApp recipients'
+  );
+
+  const multiSendResult = await sendWhatsAppReminder(multiRecipientToken, '30_day');
+  assert(
+    multiSendResult.success && (multiSendResult.providerId?.split(',').length ?? 0) === 3,
+    'AC 11.7: WhatsApp reminder message successfully dispatched to all 3 assigned recipients'
   );
 
   // -------------------------------------------------------------

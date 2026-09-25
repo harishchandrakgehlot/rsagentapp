@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Agent, Property, Token, StatusOverride } from '@/types';
+import { Agent, Property, Token, StatusOverride, TokenRecipient } from '@/types';
 import { AgentModal } from '@/components/agents/AgentModal';
 import { PropertyModal } from '@/components/properties/PropertyModal';
 import {
@@ -18,6 +18,11 @@ import {
   Calendar,
   AlertCircle,
   HelpCircle,
+  Plus,
+  Trash2,
+  Phone,
+  Star,
+  Users,
 } from 'lucide-react';
 import { getCurrentISTDateString } from '@/lib/ist';
 
@@ -67,6 +72,39 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
   const [agentMobileNumber, setAgentMobileNumber] = useState(
     initialToken?.agent_mobile_number || renewalDraft?.agent_mobile_number || ''
   );
+
+  // Multi-recipient state: Supports assigning multiple agents & WhatsApp phone recipients
+  const [recipients, setRecipients] = useState<
+    Array<{
+      id: string;
+      agent_id?: string;
+      name: string;
+      mobile: string;
+      is_primary: boolean;
+    }>
+  >(() => {
+    if (initialToken?.assigned_recipients && initialToken.assigned_recipients.length > 0) {
+      return initialToken.assigned_recipients.map((r, i) => ({
+        id: r.id || `rec-${Date.now()}-${i}`,
+        agent_id: r.agent_id,
+        name: r.name,
+        mobile: r.mobile,
+        is_primary: Boolean(r.is_primary ?? i === 0),
+      }));
+    }
+    const initAgentId = initialToken?.agent_id || renewalDraft?.agent_id || '';
+    const initMobile = initialToken?.agent_mobile_number || renewalDraft?.agent_mobile_number || '';
+    return [
+      {
+        id: `rec-${Date.now()}-0`,
+        agent_id: initAgentId,
+        name: initialToken?.agent?.name || '',
+        mobile: initMobile,
+        is_primary: true,
+      },
+    ];
+  });
+
   const [propertyId, setPropertyId] = useState(
     initialToken?.property_id || renewalDraft?.property_id || ''
   );
@@ -166,12 +204,93 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
     loadData();
   }, [initialToken, renewalDraft]);
 
-  // When agent is selected, autofill mobile number if not overridden
+  // Multi-recipient action handlers
+  const handleAddRecipient = () => {
+    setRecipients(prev => [
+      ...prev,
+      {
+        id: `rec-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        agent_id: '',
+        name: '',
+        mobile: '',
+        is_primary: false,
+      },
+    ]);
+  };
+
+  const handleRemoveRecipient = (idToRemove: string) => {
+    if (recipients.length <= 1) return;
+    setRecipients(prev => {
+      const filtered = prev.filter(r => r.id !== idToRemove);
+      if (!filtered.some(r => r.is_primary) && filtered.length > 0) {
+        filtered[0].is_primary = true;
+        setAgentId(filtered[0].agent_id || '');
+        setAgentMobileNumber(filtered[0].mobile || '');
+      }
+      return filtered;
+    });
+  };
+
+  const handleUpdateRecipient = (
+    id: string,
+    updates: Partial<{ name: string; mobile: string; is_primary: boolean }>
+  ) => {
+    setRecipients(prev =>
+      prev.map(r => {
+        if (r.id === id) {
+          const updated = { ...r, ...updates };
+          if (updates.is_primary) {
+            setAgentId(updated.agent_id || '');
+            setAgentMobileNumber(updated.mobile || '');
+          } else if (r.is_primary) {
+            if (updates.mobile !== undefined) setAgentMobileNumber(updates.mobile);
+          }
+          return updated;
+        }
+        if (updates.is_primary) {
+          return { ...r, is_primary: false };
+        }
+        return r;
+      })
+    );
+  };
+
+  const handleSelectRecipientAgent = (id: string, selectedAgentId: string) => {
+    const ag = agents.find(a => a.id === selectedAgentId);
+    setRecipients(prev =>
+      prev.map(r => {
+        if (r.id === id) {
+          const updated = {
+            ...r,
+            agent_id: selectedAgentId,
+            name: ag ? ag.name : r.name,
+            mobile: ag ? ag.mobile : r.mobile,
+          };
+          if (r.is_primary) {
+            setAgentId(selectedAgentId);
+            if (ag) setAgentMobileNumber(ag.mobile);
+          }
+          return updated;
+        }
+        return r;
+      })
+    );
+  };
+
+  // When primary agent is selected, autofill mobile number if not overridden
   const handleAgentChange = (selectedId: string) => {
     setAgentId(selectedId);
     const ag = agents.find(a => a.id === selectedId);
     if (ag) {
       setAgentMobileNumber(ag.mobile);
+      // Also update primary recipient in recipients list
+      setRecipients(prev =>
+        prev.map(r =>
+          r.is_primary
+            ? { ...r, agent_id: selectedId, name: ag.name, mobile: ag.mobile }
+            : r
+        )
+      );
     }
   };
 
@@ -205,6 +324,30 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
   // Inline Agent Creation Callback
   const handleAgentCreated = (newAgent: Agent) => {
     setAgents(prev => [...prev, newAgent]);
+    setRecipients(prev => {
+      // If the only recipient is blank, replace it
+      if (prev.length === 1 && !prev[0].mobile.trim()) {
+        return [
+          {
+            id: prev[0].id,
+            agent_id: newAgent.id,
+            name: newAgent.name,
+            mobile: newAgent.mobile,
+            is_primary: true,
+          },
+        ];
+      }
+      return [
+        ...prev,
+        {
+          id: `rec-${Date.now()}`,
+          agent_id: newAgent.id,
+          name: newAgent.name,
+          mobile: newAgent.mobile,
+          is_primary: false,
+        },
+      ];
+    });
     setAgentId(newAgent.id);
     setAgentMobileNumber(newAgent.mobile);
   };
@@ -311,15 +454,16 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
       return;
     }
 
-    if (!agentId) {
-      setError('Please select or create an assigned Agent.');
+    // Validate multi-recipients
+    const validRecipients = recipients.filter(r => r.mobile && r.mobile.trim());
+    if (validRecipients.length === 0) {
+      setError('Please add at least one Assigned Agent / WhatsApp Recipient with a valid mobile number.');
       return;
     }
 
-    if (!agentMobileNumber.trim()) {
-      setError('Agent mobile number is required.');
-      return;
-    }
+    const primaryRec = validRecipients.find(r => r.is_primary) || validRecipients[0];
+    const resolvedAgentId = primaryRec.agent_id || agentId || agents[0]?.id || 'ag-default';
+    const resolvedMobile = primaryRec.mobile.trim();
 
     const hasAddress = (plotHouseNo.trim() || addressLine1.trim()) && city.trim();
     if (!propertyId && !hasAddress) {
@@ -362,8 +506,14 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
       const payload = {
         token_number: normNumber,
         associate_name: associateName.trim(),
-        agent_id: agentId,
-        agent_mobile_number: agentMobileNumber.trim(),
+        agent_id: resolvedAgentId,
+        agent_mobile_number: resolvedMobile,
+        assigned_recipients: validRecipients.map(r => ({
+          agent_id: r.agent_id || undefined,
+          name: r.name.trim() || 'Agent',
+          mobile: r.mobile.trim(),
+          is_primary: r.id === primaryRec.id,
+        })),
         property_id: propertyId || undefined,
         property_address: propertyAddressPayload,
         start_date: startDate,
@@ -475,66 +625,145 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
           </div>
         </div>
 
-        {/* Card 2: Assigned Agent & Token Mobile Override */}
+        {/* Card 2: Assigned Agents & WhatsApp Recipients (Multi-Recipient Support) */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-amber-600" />
-              <span>Assigned Agent & WhatsApp Recipient</span>
-            </h2>
-            <button
-              type="button"
-              onClick={() => setIsAgentModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>New Agent Inline</span>
-            </button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <Users className="w-4 h-4 text-amber-600" />
+                <span>Assigned Agents & WhatsApp Recipients ({recipients.length})</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Add one or multiple agents/recipients. <strong>All assigned recipients</strong> will receive automated WhatsApp messages on departure & expiry days!
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAgentModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>New Agent Master</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleAddRecipient}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Another Recipient</span>
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Select Agent <span className="text-rose-500">*</span>
-              </label>
-              {loadingMasters ? (
-                <div className="text-xs text-slate-400 py-2">Loading agents...</div>
-              ) : (
-                <select
-                  required
-                  value={agentId}
-                  onChange={e => handleAgentChange(e.target.value)}
-                  className="w-full px-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 bg-white"
-                >
-                  <option value="">-- Choose Assigned Agent --</option>
-                  {agents.map(ag => (
-                    <option key={ag.id} value={ag.id}>
-                      {ag.name} {!ag.is_active ? '(Inactive)' : ''} ({ag.mobile})
-                    </option>
-                  ))}
-                </select>
-              )}
-              <p className="text-[11px] text-slate-500 mt-1">
-                Active agents shown. Selecting an agent automatically fills their mobile number below.
-              </p>
-            </div>
+          <div className="space-y-3">
+            {recipients.map((rec, index) => (
+              <div
+                key={rec.id}
+                className={`p-3.5 rounded-xl border transition-all ${
+                  rec.is_primary
+                    ? 'bg-amber-50/40 border-amber-300 ring-1 ring-amber-400/40'
+                    : 'bg-slate-50/70 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-200/60">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-800">
+                      Recipient #{index + 1}
+                    </span>
+                    {rec.is_primary ? (
+                      <span className="text-[10px] bg-amber-200/80 text-amber-900 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Star className="w-2.5 h-2.5 fill-amber-700 text-amber-700" />
+                        <span>Primary Agent</span>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateRecipient(rec.id, { is_primary: true })}
+                        className="text-[10px] text-slate-500 hover:text-amber-800 hover:underline font-semibold"
+                      >
+                        Make Primary
+                      </button>
+                    )}
+                  </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                Token-Specific Mobile Number (+91) <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="tel"
-                required
-                value={agentMobileNumber}
-                onChange={e => setAgentMobileNumber(e.target.value)}
-                placeholder="+919820123456"
-                className="w-full px-3.5 py-2 text-sm font-mono rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 placeholder:text-slate-400"
-              />
-              <p className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-1 rounded mt-1 border border-emerald-100">
-                🔒 Strictly private. Used exclusively for automated WhatsApp expiry reminders; never shown publicly.
-              </p>
-            </div>
+                  {recipients.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRecipient(rec.id)}
+                      className="inline-flex items-center gap-1 text-[11px] text-rose-600 hover:text-rose-800 hover:underline font-semibold"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Remove</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                      Pick from Agent Master
+                    </label>
+                    <select
+                      value={rec.agent_id || ''}
+                      onChange={e => handleSelectRecipientAgent(rec.id, e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 bg-white"
+                    >
+                      <option value="">-- Choose or Enter Custom Below --</option>
+                      {agents.map(ag => (
+                        <option key={ag.id} value={ag.id}>
+                          {ag.name} {!ag.is_active ? '(Inactive)' : ''} ({ag.mobile})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                      Recipient Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={rec.name}
+                      onChange={e => handleUpdateRecipient(rec.id, { name: e.target.value })}
+                      placeholder="e.g. Ramesh Patel"
+                      className="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 uppercase mb-1">
+                      WhatsApp Mobile (+91) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={rec.mobile}
+                      onChange={e => handleUpdateRecipient(rec.id, { mobile: e.target.value })}
+                      placeholder="+919820123456"
+                      className="w-full px-3 py-1.5 text-xs font-mono rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-900 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-1 gap-2">
+            <button
+              type="button"
+              onClick={handleAddRecipient}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors self-start"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Another Agent / WhatsApp Recipient</span>
+            </button>
+
+            <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-100 flex items-center gap-1">
+              🔒 Numbers are private. All recipients listed above receive WhatsApp reminder messages for this token.
+            </span>
           </div>
         </div>
 

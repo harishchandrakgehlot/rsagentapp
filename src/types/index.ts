@@ -45,12 +45,21 @@ export interface Attachment {
   created_at: string;
 }
 
+export interface TokenRecipient {
+  id?: string;
+  agent_id?: string;
+  name: string;
+  mobile: string;
+  is_primary?: boolean;
+}
+
 export interface Token {
   id: string;
   token_number: string; // Normalized unique number
   associate_name: string;
   agent_id: string;
   agent_mobile_number: string; // Token-specific override, defaults from agent master (private)
+  assigned_recipients?: TokenRecipient[]; // Multiple assigned agents & WhatsApp recipients
   property_id: string;
   start_date: string; // YYYY-MM-DD
   end_date: string; // YYYY-MM-DD

@@ -13,6 +13,7 @@ import {
   DeliveryStatus,
   ReminderDepartureRule,
   TemplatePlaceholder,
+  TokenRecipient,
 } from '@/types';
 import {
   INITIAL_AGENTS,
@@ -751,6 +752,7 @@ export interface CreateTokenInput {
   associate_name: string;
   agent_id: string;
   agent_mobile_number?: string;
+  assigned_recipients?: TokenRecipient[];
   property_id?: string;
   property_name?: string;
   property_address?: PropertyAddress;
@@ -789,13 +791,40 @@ export function createToken(input: CreateTokenInput): Token {
     throw new Error('End Date cannot be earlier than Start Date');
   }
 
-  // Resolve Agent
+  // Resolve Primary Agent
   const agent = store.agents.find(a => a.id === input.agent_id);
   if (!agent) {
     throw new Error('Selected agent does not exist');
   }
 
   const mobileToUse = input.agent_mobile_number?.trim() || agent.mobile;
+
+  // Resolve multiple assigned recipients
+  let recipients: TokenRecipient[] = [];
+  if (Array.isArray(input.assigned_recipients) && input.assigned_recipients.length > 0) {
+    recipients = input.assigned_recipients
+      .filter(r => r && r.mobile && r.mobile.trim())
+      .map((r, i) => ({
+        id: r.id || `rec-${Date.now()}-${i}`,
+        agent_id: r.agent_id || (i === 0 ? agent.id : undefined),
+        name: r.name?.trim() || (i === 0 ? agent.name : 'Recipient'),
+        mobile: r.mobile.trim(),
+        is_primary: Boolean(r.is_primary ?? i === 0),
+      }));
+  }
+
+  // Default to primary agent if no recipient list provided
+  if (recipients.length === 0) {
+    recipients = [
+      {
+        id: `rec-${Date.now()}-0`,
+        agent_id: agent.id,
+        name: agent.name,
+        mobile: mobileToUse,
+        is_primary: true,
+      },
+    ];
+  }
 
   // Resolve Property (Structured Address or property_name or property_id)
   let propertyId = input.property_id;
@@ -817,6 +846,7 @@ export function createToken(input: CreateTokenInput): Token {
     associate_name: input.associate_name.trim(),
     agent_id: agent.id,
     agent_mobile_number: mobileToUse,
+    assigned_recipients: recipients,
     property_id: propertyId,
     start_date: input.start_date,
     end_date: input.end_date,
@@ -908,6 +938,14 @@ export function updateToken(
     );
     if (dup) {
       throw new Error(`Token number "${updates.token_number}" already exists.`);
+    }
+  }
+
+  if (updates.assigned_recipients && updates.assigned_recipients.length > 0) {
+    const primary = updates.assigned_recipients.find(r => r.is_primary) || updates.assigned_recipients[0];
+    if (primary) {
+      if (primary.agent_id) updates.agent_id = primary.agent_id;
+      if (primary.mobile) updates.agent_mobile_number = primary.mobile;
     }
   }
 
@@ -1410,9 +1448,23 @@ function populateTokenRelations(token: Token): Token {
     token.is_archived
   );
 
+  let recipients = token.assigned_recipients;
+  if (!Array.isArray(recipients) || recipients.length === 0) {
+    recipients = [
+      {
+        id: `rec-prim-${token.id}`,
+        agent_id: token.agent_id,
+        name: agent?.name || 'Assigned Agent',
+        mobile: token.agent_mobile_number,
+        is_primary: true,
+      },
+    ];
+  }
+
   return {
     ...token,
     agent,
+    assigned_recipients: recipients,
     property,
     attachments,
     renewal_previous_token: renewalPrevious,

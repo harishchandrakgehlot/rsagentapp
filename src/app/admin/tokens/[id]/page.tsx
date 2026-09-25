@@ -262,18 +262,36 @@ export default function TokenDetailPage({ params: paramsPromise }: Props) {
 
             <div>
               <span className="font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                Assigned Agent
+                Assigned Agents & Recipients ({token.assigned_recipients?.length || 1})
               </span>
-              <p className="text-sm font-semibold text-slate-900">
-                {token.agent?.name}
-              </p>
-              <p className="font-mono text-slate-600 flex items-center gap-1 mt-0.5">
-                <Phone className="w-3 h-3 text-slate-400" />
-                <span>{token.agent_mobile_number}</span>
-                <span className="text-[10px] bg-slate-100 text-slate-500 px-1 rounded ml-1">
-                  Private
-                </span>
-              </p>
+              <div className="space-y-1.5 mt-0.5">
+                {(token.assigned_recipients && token.assigned_recipients.length > 0
+                  ? token.assigned_recipients
+                  : [
+                      {
+                        name: token.agent?.name || 'Assigned Agent',
+                        mobile: token.agent_mobile_number,
+                        is_primary: true,
+                      },
+                    ]
+                ).map((rec, idx) => (
+                  <div key={idx} className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-slate-900">{rec.name}</span>
+                    <span className="font-mono text-slate-600 flex items-center gap-1 text-[11px]">
+                      <Phone className="w-2.5 h-2.5 text-slate-400" />
+                      <span>{rec.mobile}</span>
+                      <span className="text-[9px] bg-slate-100 text-slate-500 px-1 rounded">
+                        Private
+                      </span>
+                    </span>
+                    {rec.is_primary && (
+                      <span className="text-[9px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.2 rounded-full">
+                        ★ Primary
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div>

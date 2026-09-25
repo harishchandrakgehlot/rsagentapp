@@ -104,6 +104,7 @@ export function buildReminderMessageText(token: Token, reminderType: ReminderTyp
 
 /**
  * Sends a WhatsApp expiry reminder via Meta WhatsApp Business Cloud API
+ * to ALL assigned agents and WhatsApp recipients registered for the token,
  * or falls back to realistic simulation if credentials are not yet configured.
  */
 export async function sendWhatsAppReminder(
@@ -112,16 +113,54 @@ export async function sendWhatsAppReminder(
 ): Promise<WhatsAppSendResult> {
   const tokenSecret = getWhatsAppToken();
   const phoneNumberId = getWhatsAppPhoneNumberId();
-  let recipient = token.agent_mobile_number.replace(/\D/g, ''); // E.164 digits without +
-  if (recipient.length === 10) {
-    recipient = `91${recipient}`;
-  } else if (recipient.length === 11 && recipient.startsWith('0')) {
-    recipient = `91${recipient.slice(1)}`;
+
+  // Gather all recipients from assigned_recipients + fallback primary agent
+  const rawRecipients: Array<{ name: string; mobile: string }> = [];
+
+  if (Array.isArray(token.assigned_recipients) && token.assigned_recipients.length > 0) {
+    for (const r of token.assigned_recipients) {
+      if (r.mobile && r.mobile.trim()) {
+        rawRecipients.push({
+          name: r.name?.trim() || token.agent?.name || 'Agent',
+          mobile: r.mobile.trim(),
+        });
+      }
+    }
   }
 
-  const messageText = buildReminderMessageText(token, reminderType);
+  // Ensure primary mobile is included if list was empty
+  if (rawRecipients.length === 0 && token.agent_mobile_number) {
+    rawRecipients.push({
+      name: token.agent?.name || 'Agent',
+      mobile: token.agent_mobile_number,
+    });
+  }
 
-  // If live Meta credentials are provided, call Meta Cloud API
+  // Normalize mobile number to E.164 digits without leading +
+  const normalizeMobile = (m: string) => {
+    let clean = m.replace(/\D/g, '');
+    if (clean.length === 10) {
+      clean = `91${clean}`;
+    } else if (clean.length === 11 && clean.startsWith('0')) {
+      clean = `91${clean.slice(1)}`;
+    }
+    return clean;
+  };
+
+  // De-duplicate unique phone numbers
+  const uniqueRecipients = rawRecipients.filter(
+    (item, index, self) =>
+      index === self.findIndex(r => normalizeMobile(r.mobile) === normalizeMobile(item.mobile))
+  );
+
+  if (uniqueRecipients.length === 0) {
+    return {
+      success: false,
+      error: 'No valid recipient phone numbers configured for this token.',
+    };
+  }
+
+  // If live Meta credentials are provided, dispatch to EACH recipient
   if (tokenSecret && phoneNumberId) {
     if (/[^\x20-\x7E]/.test(tokenSecret) || tokenSecret.startsWith('❌')) {
       return {
@@ -129,57 +168,76 @@ export async function sendWhatsAppReminder(
         error: 'Invalid Meta Access Token: Token contains non-ASCII characters or an error message. Please re-enter it in Settings.',
       };
     }
-    try {
-      const response = await fetch(
-        `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${tokenSecret.trim()}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            recipient_type: 'individual',
-            to: recipient,
-            type: 'text',
-            text: {
-              preview_url: true,
-              body: messageText,
+
+    const providerIds: string[] = [];
+    const errors: string[] = [];
+
+    for (const rec of uniqueRecipients) {
+      const recipientDigits = normalizeMobile(rec.mobile);
+      // Personalize message with the specific recipient's name
+      const personalizedToken: Token = {
+        ...token,
+        agent: {
+          ...(token.agent || { id: 'ag', mobile: rec.mobile, is_active: true, created_at: '', updated_at: '' }),
+          name: rec.name,
+        },
+      };
+      const messageText = buildReminderMessageText(personalizedToken, reminderType);
+
+      try {
+        const response = await fetch(
+          `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${tokenSecret.trim()}`,
+              'Content-Type': 'application/json',
             },
-          }),
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              recipient_type: 'individual',
+              to: recipientDigits,
+              type: 'text',
+              text: {
+                preview_url: true,
+                body: messageText,
+              },
+            }),
+          }
+        );
+
+        const data = await response.json();
+        if (response.ok && data.messages?.[0]?.id) {
+          providerIds.push(data.messages[0].id);
+        } else {
+          errors.push(data.error?.message || `HTTP ${response.status} sending to ${recipientDigits}`);
         }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return {
-          success: false,
-          error: data.error?.message || `HTTP ${response.status} from Meta API`,
-        };
+      } catch (err: unknown) {
+        errors.push(err instanceof Error ? err.message : `Error sending to ${recipientDigits}`);
       }
+    }
 
-      const msgId = data.messages?.[0]?.id || `wamid.${Date.now()}`;
+    if (providerIds.length > 0) {
       return {
         success: true,
-        providerId: msgId,
+        providerId: providerIds.join(', '),
         simulated: false,
       };
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Network error communicating with Meta API';
-      return {
-        success: false,
-        error: errorMessage,
-      };
     }
+
+    return {
+      success: false,
+      error: errors.join('; ') || 'Failed to dispatch to recipients',
+    };
   }
 
-  // Realistic Simulation / Development fallback
-  const mockMsgId = `wamid.SIM_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  // Realistic Simulation / Development fallback for all recipients
+  const mockIds = uniqueRecipients.map(
+    () => `wamid.SIM_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+  );
   return {
     success: true,
-    providerId: mockMsgId,
+    providerId: mockIds.join(', '),
     simulated: true,
   };
 }
