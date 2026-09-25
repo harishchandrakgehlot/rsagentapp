@@ -3,10 +3,10 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PublicHeader, PublicFooter } from '@/components/layout/PublicHeader';
-import { Search, ShieldCheck, ArrowRight, CheckCircle2, FileCheck, QrCode } from 'lucide-react';
-import { RoyalLogo } from '@/components/brand/RoyalLogo';
+import { Search, ArrowRight, CheckCircle2, FileCheck, QrCode } from 'lucide-react';
 
 export default function PublicLandingPage() {
+
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');

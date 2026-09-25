@@ -2,7 +2,8 @@ import React from 'react';
 import { getArchivedTokens } from '@/lib/store';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { TokenListTable } from '@/components/tokens/TokenListTable';
-import { Archive, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
+
 
 export const dynamic = 'force-dynamic';
 

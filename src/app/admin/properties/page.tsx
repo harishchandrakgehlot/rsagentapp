@@ -23,21 +23,29 @@ export default function AdminPropertiesPage() {
   const [showModal, setShowModal] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
 
-  const loadProperties = async () => {
-    try {
-      const res = await fetch('/api/properties?includeInactive=true');
-      const data = await res.json();
-      setProperties(data.properties || []);
-    } catch (err) {
-      console.error('Error loading properties', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    loadProperties();
+    let ignore = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/properties?includeInactive=true');
+        const data = await res.json();
+        if (!ignore) {
+          setProperties(data.properties || []);
+        }
+      } catch (err) {
+        console.error('Error loading properties', err);
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
   }, []);
+
 
   const handleToggleStatus = async (prop: Property) => {
     const actionName = prop.is_active ? 'deactivate' : 'reactivate';

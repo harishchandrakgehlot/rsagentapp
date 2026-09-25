@@ -11,6 +11,17 @@ export interface WhatsAppSendResult {
   simulated?: boolean;
 }
 
+/** Typed shape for Meta WhatsApp Graph API responses */
+interface MetaApiResponse {
+  messages?: { id: string }[];
+  error?: {
+    code: number;
+    message: string;
+    type?: string;
+    error_subcode?: number;
+  };
+}
+
 /**
  * Generates the reminder message content according to PRD section 7.2:
  * "Reminder content includes token number, property name, relevant dates, current status, and public tracking link."
@@ -318,8 +329,9 @@ export async function sendDirectWhatsAppMessage({
       return { response: res, data: json };
     };
 
-    let response: Response;
-    let data: any;
+    let response: Response | null = null;
+    let data: MetaApiResponse = {};
+
 
     if (!templateName) {
       // Send as free-form text first
@@ -387,13 +399,13 @@ export async function sendDirectWhatsAppMessage({
         }
       }
 
-      if (!response!.ok && lastErrorData) {
+      if ((!response || !response.ok) && lastErrorData) {
         data = lastErrorData;
       }
     }
 
-    if (!response!.ok) {
-      let customError = data.error?.message || `HTTP ${response!.status} from Meta API`;
+    if (!response || !response.ok) {
+      let customError = data.error?.message || `HTTP ${response?.status || 500} from Meta API`;
       if (data.error?.code === 131058) {
         customError = `Meta Restriction (#131058): The "hello_world" template can only be sent from Meta sandbox numbers (+1 555...). Since +91 98191 43222 is an official live business number, select "Custom Text Notification" (after sending "Hi" to +91 98191 43222 from your phone) or click "Register Production Template" to create an approved template.`;
       }

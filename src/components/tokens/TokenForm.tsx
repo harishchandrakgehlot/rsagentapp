@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Agent, Property, Token, StatusOverride, TokenRecipient } from '@/types';
+import { Agent, Property, Token, StatusOverride } from '@/types';
 import { AgentModal } from '@/components/agents/AgentModal';
 import { PropertyModal } from '@/components/properties/PropertyModal';
 import {
@@ -14,17 +14,17 @@ import {
   X,
   FileText,
   Image as ImageIcon,
-  CheckCircle2,
   Calendar,
   AlertCircle,
   HelpCircle,
   Plus,
   Trash2,
-  Phone,
   Star,
   Users,
+  Loader2,
 } from 'lucide-react';
 import { getCurrentISTDateString } from '@/lib/ist';
+
 
 interface Props {
   initialToken?: Token | null;
@@ -69,9 +69,7 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
   const [agentId, setAgentId] = useState(
     initialToken?.agent_id || renewalDraft?.agent_id || ''
   );
-  const [agentMobileNumber, setAgentMobileNumber] = useState(
-    initialToken?.agent_mobile_number || renewalDraft?.agent_mobile_number || ''
-  );
+
 
   // Multi-recipient state: Supports assigning multiple agents & WhatsApp phone recipients
   const [recipients, setRecipients] = useState<
@@ -225,7 +223,6 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
       if (!filtered.some(r => r.is_primary) && filtered.length > 0) {
         filtered[0].is_primary = true;
         setAgentId(filtered[0].agent_id || '');
-        setAgentMobileNumber(filtered[0].mobile || '');
       }
       return filtered;
     });
@@ -241,9 +238,6 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
           const updated = { ...r, ...updates };
           if (updates.is_primary) {
             setAgentId(updated.agent_id || '');
-            setAgentMobileNumber(updated.mobile || '');
-          } else if (r.is_primary) {
-            if (updates.mobile !== undefined) setAgentMobileNumber(updates.mobile);
           }
           return updated;
         }
@@ -268,7 +262,6 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
           };
           if (r.is_primary) {
             setAgentId(selectedAgentId);
-            if (ag) setAgentMobileNumber(ag.mobile);
           }
           return updated;
         }
@@ -277,22 +270,6 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
     );
   };
 
-  // When primary agent is selected, autofill mobile number if not overridden
-  const handleAgentChange = (selectedId: string) => {
-    setAgentId(selectedId);
-    const ag = agents.find(a => a.id === selectedId);
-    if (ag) {
-      setAgentMobileNumber(ag.mobile);
-      // Also update primary recipient in recipients list
-      setRecipients(prev =>
-        prev.map(r =>
-          r.is_primary
-            ? { ...r, agent_id: selectedId, name: ag.name, mobile: ag.mobile }
-            : r
-        )
-      );
-    }
-  };
 
   // When existing property is chosen from dropdown, autofill the fields
   const handleSelectExistingProperty = (selectedId: string) => {
@@ -349,8 +326,8 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
       ];
     });
     setAgentId(newAgent.id);
-    setAgentMobileNumber(newAgent.mobile);
   };
+
 
   // Inline Property Creation Callback
   const handlePropertyCreated = (newProp: Property) => {
@@ -780,8 +757,13 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
               </p>
             </div>
 
-            {/* Quick Autofill from existing properties if any exist in master */}
-            {properties.length > 0 && (
+            {/* Loading indicator or Quick Autofill from existing properties */}
+            {loadingMasters ? (
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2D3774]" />
+                <span>Loading properties...</span>
+              </div>
+            ) : properties.length > 0 && (
               <div className="flex items-center gap-2">
                 <select
                   value={propertyId}
@@ -789,6 +771,7 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
                   className="px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2D3774] text-slate-800 bg-slate-50 font-medium"
                 >
                   <option value="">-- Or Autofill From Saved Property --</option>
+
                   {properties.map(pr => (
                     <option key={pr.id} value={pr.id}>
                       {pr.name}

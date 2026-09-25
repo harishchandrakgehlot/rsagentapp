@@ -1,3 +1,4 @@
+import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
 export const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'harishchandrakgehlot@gmail.com';
@@ -9,6 +10,12 @@ export interface AdminSession {
   loggedInAt: string;
 }
 
+/** Returns a consistent Uint8Array secret from env or a long fallback dev key */
+function getJwtSecret(): Uint8Array {
+  const raw = process.env.SESSION_SECRET || 'royal-services-dev-secret-change-in-prod-min32chars!!';
+  return new TextEncoder().encode(raw);
+}
+
 /**
  * Validates Super Admin login credentials
  */
@@ -18,7 +25,6 @@ export async function authenticateSuperAdmin(email: string, password: string): P
 
   // Validate email matches configured Super Admin
   if (normalizedEmail !== configuredEmail) {
-    // Neutral failure message per PRD FR 002
     return { success: false, error: 'Invalid email or password.' };
   }
 
@@ -28,17 +34,20 @@ export async function authenticateSuperAdmin(email: string, password: string): P
     return { success: false, error: 'Invalid email or password.' };
   }
 
-  // Create session cookie
-  const cookieStore = await cookies();
   const sessionData: AdminSession = {
     email: configuredEmail,
     role: 'super_admin',
     loggedInAt: new Date().toISOString(),
   };
 
-  // Encoded secure session token
-  const token = Buffer.from(JSON.stringify(sessionData)).toString('base64');
+  // Sign with HS256 — cryptographically verified, cannot be forged
+  const token = await new SignJWT({ ...sessionData })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setExpirationTime('7d')
+    .setIssuedAt()
+    .sign(getJwtSecret());
 
+  const cookieStore = await cookies();
   cookieStore.set(AUTH_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
@@ -51,7 +60,7 @@ export async function authenticateSuperAdmin(email: string, password: string): P
 }
 
 /**
- * Checks if current request has a valid Super Admin session
+ * Checks if current request has a valid, cryptographically-verified Super Admin session
  */
 export async function getSuperAdminSession(): Promise<AdminSession | null> {
   const cookieStore = await cookies();
@@ -59,12 +68,13 @@ export async function getSuperAdminSession(): Promise<AdminSession | null> {
   if (!sessionCookie?.value) return null;
 
   try {
-    const raw = Buffer.from(sessionCookie.value, 'base64').toString('utf-8');
-    const data = JSON.parse(raw) as AdminSession;
-    if (data.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase() && data.role === 'super_admin') {
+    const { payload } = await jwtVerify(sessionCookie.value, getJwtSecret());
+    const data = payload as unknown as AdminSession;
+    if (data.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase() && data.role === 'super_admin') {
       return data;
     }
   } catch {
+    // Invalid or expired JWT — treat as unauthenticated
     return null;
   }
 
@@ -83,16 +93,7 @@ export async function clearSuperAdminSession(): Promise<void> {
  * Handles password reset request
  */
 export async function requestPasswordReset(email: string): Promise<{ success: boolean; message: string }> {
-  // PRD FR 002 & FR 003: Do not reveal whether account exists, send reset link if matches
-  const normalized = email.trim().toLowerCase();
-  if (normalized === SUPER_ADMIN_EMAIL.toLowerCase()) {
-    // In production with Supabase, triggers supabase.auth.resetPasswordForEmail
-    return {
-      success: true,
-      message: `If an account exists for ${email}, a secure password reset link has been dispatched to your inbox.`,
-    };
-  }
-
+  // PRD FR 002 & FR 003: Do not reveal whether account exists
   return {
     success: true,
     message: `If an account exists for ${email}, a secure password reset link has been dispatched to your inbox.`,

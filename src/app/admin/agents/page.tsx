@@ -40,8 +40,27 @@ export default function AdminAgentsPage() {
   };
 
   useEffect(() => {
-    loadAgents();
+    let ignore = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/agents?includeInactive=true');
+        const data = await res.json();
+        if (!ignore) {
+          setAgents(data.agents || []);
+        }
+      } catch (err) {
+        console.error('Error loading agents', err);
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
   }, []);
+
 
   const handleToggleStatus = async (agent: Agent) => {
     const actionName = agent.is_active ? 'deactivate' : 'reactivate';

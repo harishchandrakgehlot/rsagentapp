@@ -5,7 +5,6 @@ import { ActivityLog } from '@/types';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { formatReadableISTDateTime } from '@/lib/ist';
 import {
-  History,
   Search,
   Filter,
   Send,
@@ -16,6 +15,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
+
 export default function AdminActivityPage() {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [search, setSearch] = useState('');
@@ -25,10 +25,11 @@ export default function AdminActivityPage() {
 
   const loadLogs = async () => {
     try {
-      let url = '/api/activity?';
-      if (targetType !== 'all') url += `&targetType=${targetType}`;
-      if (actionFilter !== 'all') url += `&action=${actionFilter}`;
-      if (search.trim()) url += `&search=${encodeURIComponent(search)}`;
+      const params = new URLSearchParams();
+      if (targetType !== 'all') params.set('targetType', targetType);
+      if (actionFilter !== 'all') params.set('action', actionFilter);
+      if (search.trim()) params.set('search', search.trim());
+      const url = `/api/activity${params.toString() ? `?${params.toString()}` : ''}`;
 
       const res = await fetch(url);
       const data = await res.json();
@@ -41,8 +42,36 @@ export default function AdminActivityPage() {
   };
 
   useEffect(() => {
-    loadLogs();
+    let ignore = false;
+    (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (targetType !== 'all') params.set('targetType', targetType);
+        if (actionFilter !== 'all') params.set('action', actionFilter);
+        if (search.trim()) params.set('search', search.trim());
+        const url = `/api/activity${params.toString() ? `?${params.toString()}` : ''}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!ignore) {
+          setLogs(data.logs || []);
+        }
+      } catch (err) {
+        console.error('Error loading logs', err);
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetType, actionFilter]);
+
+
+
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +133,21 @@ export default function AdminActivityPage() {
               <option value="property">Properties</option>
               <option value="auth">Admin Authentication</option>
             </select>
+
+            <select
+              value={actionFilter}
+              onChange={e => setActionFilter(e.target.value)}
+              className="px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="all">All Actions</option>
+              <option value="create">Created</option>
+              <option value="update">Updated</option>
+              <option value="whatsapp_sent">WhatsApp Sent</option>
+              <option value="whatsapp_failed">WhatsApp Failed</option>
+              <option value="login">Login</option>
+            </select>
           </div>
+
 
           <button
             type="submit"

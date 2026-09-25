@@ -12,7 +12,6 @@ import { formatReadableISTDate, formatReadableISTDateTime } from '@/lib/ist';
 import {
   FileText,
   Building2,
-  Calendar,
   Phone,
   QrCode,
   Printer,
@@ -21,14 +20,10 @@ import {
   RefreshCw,
   Send,
   AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Edit3,
-  PauseCircle,
-  XCircle,
   Link as LinkIcon,
   Image as ImageIcon,
 } from 'lucide-react';
+
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -69,8 +64,34 @@ export default function TokenDetailPage({ params: paramsPromise }: Props) {
   };
 
   useEffect(() => {
-    loadToken();
+    let ignore = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/tokens/${params.id}`);
+        if (!res.ok) {
+          throw new Error('Token not found');
+        }
+        const data = await res.json();
+        if (!ignore) {
+          setToken(data.token);
+          setReminders(data.reminders || []);
+        }
+      } catch (err: unknown) {
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : 'Error loading token';
+          setError(msg);
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
   }, [params.id]);
+
 
   const handleStatusOverride = async (newOverride: StatusOverride) => {
     if (!token) return;

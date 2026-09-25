@@ -48,7 +48,15 @@ export function AgentBulkImportModal({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (!isOpen) return null;
+  // ── All hooks must be declared before any early return ──────────────────
+  const validRows = useMemo(() => parsedRows.filter(r => r.isValid), [parsedRows]);
+  const errorRows = useMemo(() => parsedRows.filter(r => !r.isValid), [parsedRows]);
+
+  const displayedRows = useMemo(() => {
+    if (filterMode === 'valid') return validRows;
+    if (filterMode === 'errors') return errorRows;
+    return parsedRows;
+  }, [filterMode, parsedRows, validRows, errorRows]);
 
   // Helper to normalize mobile to +91XXXXXXXXXX
   const normalizeMobile = (mobile: string): string => {
@@ -243,15 +251,6 @@ export function AgentBulkImportModal({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const validRows = useMemo(() => parsedRows.filter(r => r.isValid), [parsedRows]);
-  const errorRows = useMemo(() => parsedRows.filter(r => !r.isValid), [parsedRows]);
-
-  const displayedRows = useMemo(() => {
-    if (filterMode === 'valid') return validRows;
-    if (filterMode === 'errors') return errorRows;
-    return parsedRows;
-  }, [filterMode, parsedRows, validRows, errorRows]);
-
   const handleExecuteImport = async () => {
     if (validRows.length === 0) {
       setGeneralError('No valid agents to import.');
@@ -291,6 +290,10 @@ export function AgentBulkImportModal({
       setSubmitting(false);
     }
   };
+
+  // Conditionally render nothing when modal is not open
+  // (done here AFTER all hooks so Rules of Hooks is satisfied)
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">

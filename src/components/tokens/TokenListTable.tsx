@@ -19,8 +19,8 @@ import {
   Building2,
   Calendar,
   ExternalLink,
-  ShieldAlert,
 } from 'lucide-react';
+
 
 interface Props {
   initialTokens: Token[];

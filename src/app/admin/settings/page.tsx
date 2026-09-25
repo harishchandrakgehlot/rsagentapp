@@ -12,15 +12,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
-  ExternalLink,
   Phone,
-  Check,
   Sparkles,
   Edit3,
   Eye,
   EyeOff,
   Trash2,
 } from 'lucide-react';
+
 
 export default function AdminSettingsPage() {
   const [testingCron, setTestingCron] = useState(false);
@@ -64,26 +63,34 @@ export default function AdminSettingsPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   React.useEffect(() => {
-    try {
-      const localToken = localStorage.getItem('rs_meta_token');
-      if (localToken) {
-        if (/[^\x20-\x7E]/.test(localToken) || localToken.startsWith('❌')) {
-          localStorage.removeItem('rs_meta_token');
-          setCustomToken('');
-          setHasSavedToken(false);
-        } else {
-          setCustomToken(localToken);
-          setHasSavedToken(true);
+    let ignore = false;
+    // Restore any token stored locally in localStorage asynchronously
+    const timer = setTimeout(() => {
+      if (ignore) return;
+      try {
+        const localToken = localStorage.getItem('rs_meta_token');
+        if (localToken) {
+          if (/[^\x20-\x7E]/.test(localToken) || localToken.startsWith('❌')) {
+            localStorage.removeItem('rs_meta_token');
+            setCustomToken('');
+            setHasSavedToken(false);
+          } else {
+            setCustomToken(localToken);
+            setHasSavedToken(true);
+          }
         }
-      }
-      const localPhoneId = localStorage.getItem('rs_meta_phone_id');
-      if (localPhoneId) {
-        setPhoneNumberId(localPhoneId);
-        setEditPhoneIdValue(localPhoneId);
-      }
-    } catch {}
+        const localPhoneId = localStorage.getItem('rs_meta_phone_id');
+        if (localPhoneId) {
+          setPhoneNumberId(localPhoneId);
+          setEditPhoneIdValue(localPhoneId);
+        }
+      } catch {}
+    }, 0);
 
-    fetch('/api/whatsapp/config')
+
+    // Fetch server-side config with AbortController to avoid setState on unmounted component
+    const controller = new AbortController();
+    fetch('/api/whatsapp/config', { signal: controller.signal })
       .then(res => res.json())
       .then(data => {
         if (data.hasToken) setHasSavedToken(true);
@@ -97,8 +104,20 @@ export default function AdminSettingsPage() {
         if (data.businessPhone) setBusinessPhone(data.businessPhone);
         if (data.businessAccountId) setBusinessAccountId(data.businessAccountId);
       })
-      .catch(() => {});
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          // Network error — ignore silently, user can still use the form
+        }
+      });
+
+    return () => {
+      ignore = true;
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, []);
+
+
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);

@@ -12,15 +12,11 @@ import {
   Terminal,
   Layers,
   ChevronRight,
-  ShieldCheck,
-  Phone,
-  Building,
-  Key,
   Globe,
-  Code2,
   BookOpen,
   Sparkles,
 } from 'lucide-react';
+
 
 interface EndpointParam {
   name: string;
@@ -79,7 +75,6 @@ interface OpenApiData {
 
 export default function AdminOpenApiPage() {
   const [data, setData] = useState<OpenApiData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [selectedEndpointId, setSelectedEndpointId] = useState<string>('send_message');
   const [activeCodeLang, setActiveCodeLang] = useState<'curl' | 'js' | 'python' | 'node'>('curl');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -100,9 +95,9 @@ export default function AdminOpenApiPage() {
           setData(resData.openApi);
         }
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch(() => {});
   }, []);
+
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);

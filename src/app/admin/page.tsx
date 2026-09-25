@@ -7,11 +7,9 @@ import { DashboardMetrics, Token, ActivityLog } from '@/types';
 import { TokenStatusBadge } from '@/components/tokens/TokenStatusBadge';
 import { formatReadableISTDate, formatReadableISTDateTime } from '@/lib/ist';
 import {
-  Ticket,
   CheckCircle2,
   Clock,
   AlertTriangle,
-  PauseCircle,
   Users,
   BellRing,
   Send,
@@ -19,20 +17,22 @@ import {
   Plus,
   Archive,
   RefreshCw,
-  ExternalLink,
   ShieldCheck,
   Check,
 } from 'lucide-react';
+
 
 export default function AdminDashboardPage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentTokens, setRecentTokens] = useState<Token[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [evaluatingReminders, setEvaluatingReminders] = useState(false);
   const [evalMessage, setEvalMessage] = useState('');
 
   const fetchDashboardData = async () => {
+    setFetchError(false);
     try {
       const res = await fetch('/api/dashboard');
       if (res.ok) {
@@ -40,17 +40,46 @@ export default function AdminDashboardPage() {
         setMetrics(data.metrics);
         setRecentTokens(data.recentTokens || []);
         setRecentActivity(data.recentActivity || []);
+      } else {
+        setFetchError(true);
       }
-    } catch (err) {
-      console.error('Failed to load dashboard', err);
+    } catch {
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchDashboardData();
+    let ignore = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/dashboard');
+        if (res.ok) {
+          const data = await res.json();
+          if (!ignore) {
+            setMetrics(data.metrics);
+            setRecentTokens(data.recentTokens || []);
+            setRecentActivity(data.recentActivity || []);
+          }
+        } else if (!ignore) {
+          setFetchError(true);
+        }
+      } catch {
+        if (!ignore) {
+          setFetchError(true);
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
   }, []);
+
 
   const handleRunReminders = async () => {
     setEvaluatingReminders(true);
@@ -72,8 +101,31 @@ export default function AdminDashboardPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-3">
-          <div className="w-8 h-8 border-3 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <div className="w-8 h-8 border-2 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-xs text-slate-500 font-medium">Loading Royal Services Administration...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4 max-w-sm">
+          <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto text-rose-500">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Failed to Load Dashboard</p>
+            <p className="text-xs text-slate-500 mt-1">Could not fetch data from the server. Please check your connection and try again.</p>
+          </div>
+          <button
+            onClick={() => { setLoading(true); fetchDashboardData(); }}
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-[#2D3774] hover:bg-[#222B5C] rounded-xl transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Retry
+          </button>
         </div>
       </div>
     );

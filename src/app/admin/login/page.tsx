@@ -106,12 +106,13 @@ export default function AdminLoginPage() {
             /* Login Form */
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                <label htmlFor="admin-email" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                   Super Admin Email
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3 pointer-events-none" />
                   <input
+                    id="admin-email"
                     type="email"
                     required
                     value={email}
@@ -124,7 +125,7 @@ export default function AdminLoginPage() {
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  <label htmlFor="admin-password" className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Password
                   </label>
                   <button
@@ -142,6 +143,7 @@ export default function AdminLoginPage() {
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3 pointer-events-none" />
                   <input
+                    id="admin-password"
                     type="password"
                     required
                     value={password}
@@ -152,6 +154,7 @@ export default function AdminLoginPage() {
                 </div>
               </div>
 
+
               <button
                 type="submit"
                 disabled={submitting}
@@ -161,12 +164,7 @@ export default function AdminLoginPage() {
                 <ArrowRight className="w-4 h-4" />
               </button>
 
-              <div className="p-3 mt-4 bg-slate-950 rounded-xl border border-slate-800/80 text-[11px] text-slate-400">
-                <span className="text-blue-300 font-semibold block mb-0.5">
-                  Dev/Demo Access Note:
-                </span>
-                Password is set to <code className="text-slate-200 font-mono">RoyalAdmin2026!</code> in local configuration.
-              </div>
+
             </form>
           ) : (
             /* Forgot Password Form */

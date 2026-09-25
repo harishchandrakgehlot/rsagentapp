@@ -26,6 +26,26 @@ export function AdminSidebar() {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [userEmail, setUserEmail] = useState('harishchandrakgehlot@gmail.com');
+
+  React.useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/session');
+        if (res.ok) {
+          const data = await res.json();
+          if (!ignore && data.email) {
+            setUserEmail(data.email);
+          }
+        }
+      } catch {}
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
 
   const navItems = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -128,7 +148,7 @@ export function AdminSidebar() {
               Super Admin
             </p>
             <p className="text-[11px] text-slate-400 truncate">
-              harishchandrakgehlot@gmail.com
+              {userEmail}
             </p>
           </div>
         </div>
@@ -171,12 +191,16 @@ export function AdminSidebar() {
 
       {/* Mobile Sliding Sidebar */}
       <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label="Admin Navigation Menu"
         className={`md:hidden fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-200 ease-in-out ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {navContent}
       </aside>
+
 
       {/* Desktop Persistent Sidebar */}
       <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-30 shadow-xl">

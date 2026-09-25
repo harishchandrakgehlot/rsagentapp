@@ -17,11 +17,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Info,
-  ExternalLink,
-  ChevronDown,
-  ChevronUp,
   FileCode2,
-  Check,
 } from 'lucide-react';
 import { ReminderDepartureRule, TemplatePlaceholder } from '@/types';
 
@@ -63,29 +59,6 @@ export default function AdminTemplatesPage() {
     trackingUrl: 'https://rsagentapp.vercel.app/track/RS-2026-0842',
   };
 
-  useEffect(() => {
-    fetchRules();
-    fetchMetaTemplatesList();
-  }, []);
-
-  const fetchRules = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/admin/reminder-templates');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.rules)) {
-        setRules(data.rules);
-        if (data.placeholders) setPlaceholders(data.placeholders);
-        if (data.rules.length > 0 && !data.rules.find((r: ReminderDepartureRule) => r.id === expandedRuleId)) {
-          setExpandedRuleId(data.rules[0].id);
-        }
-      }
-    } catch {
-      setStatusMessage({ type: 'error', text: 'Failed to load departure rules from server.' });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchMetaTemplatesList = async () => {
     setFetchingMetaTemplates(true);
@@ -102,7 +75,57 @@ export default function AdminTemplatesPage() {
     }
   };
 
+  // Now that both fetch functions are declared, call them on mount with cleanup
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/reminder-templates');
+        const data = await res.json();
+        if (!ignore && data.success && Array.isArray(data.rules)) {
+          setRules(data.rules);
+          if (data.placeholders) setPlaceholders(data.placeholders);
+          if (data.rules.length > 0 && !data.rules.find((r: ReminderDepartureRule) => r.id === expandedRuleId)) {
+            setExpandedRuleId(data.rules[0].id);
+          }
+        }
+      } catch {
+        if (!ignore) {
+          setStatusMessage({ type: 'error', text: 'Failed to load departure rules from server.' });
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    (async () => {
+      try {
+        const res = await fetch('/api/whatsapp/templates');
+        const data = await res.json();
+        if (!ignore && data.success && Array.isArray(data.templates)) {
+          setMetaTemplates(data.templates);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!ignore) {
+          setFetchingMetaTemplates(false);
+        }
+      }
+    })();
+
+    return () => {
+      ignore = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
+
   const handleSaveAll = async () => {
+
     setSaving(true);
     setStatusMessage(null);
     try {

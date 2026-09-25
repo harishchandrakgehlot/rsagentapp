@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createHmac } from 'crypto';
 import { updateReminderDeliveryStatus } from '@/lib/store';
 import { DeliveryStatus } from '@/types';
 
@@ -11,7 +12,10 @@ export async function GET(request: Request) {
   const token = searchParams.get('hub.verify_token');
   const challenge = searchParams.get('hub.challenge');
 
-  const expectedToken = process.env.META_WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'royal_services_webhook_verify_2026';
+  const expectedToken = process.env.META_WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+  if (!expectedToken) {
+    return NextResponse.json({ error: 'Webhook verify token not configured' }, { status: 500 });
+  }
 
   if (mode === 'subscribe' && token === expectedToken) {
     return new Response(challenge, { status: 200 });
@@ -22,10 +26,23 @@ export async function GET(request: Request) {
 
 /**
  * Meta Webhook message status updates
+ * Verifies X-Hub-Signature-256 before processing any payload.
  */
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
+    const rawBody = await request.text();
+
+    // Verify HMAC signature to reject forged webhook payloads
+    const appSecret = process.env.META_APP_SECRET;
+    if (appSecret) {
+      const signature = request.headers.get('x-hub-signature-256');
+      const expectedSig = `sha256=${createHmac('sha256', appSecret).update(rawBody).digest('hex')}`;
+      if (!signature || signature !== expectedSig) {
+        return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 403 });
+      }
+    }
+
+    const payload = JSON.parse(rawBody);
 
     // Check if payload contains WhatsApp status updates
     const entries = payload.entry || [];
@@ -51,3 +68,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
