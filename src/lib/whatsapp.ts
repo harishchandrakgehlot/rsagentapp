@@ -18,40 +18,83 @@ export interface WhatsAppSendResult {
 export function buildReminderMessageText(token: Token, reminderType: ReminderType): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://rsagentapp.vercel.app';
   const trackingUrl = `${appUrl}/track/${encodeURIComponent(token.token_number)}`;
+  const agentName = token.agent?.name || 'Agent';
+  const tokenNo = token.token_number;
+  const associateName = token.associate_name;
+  const propertyName = token.property?.name || 'Assigned Property';
+  const startDate = formatReadableISTDate(token.start_date);
+  const endDate = formatReadableISTDate(token.end_date);
+  const status = token.computed_status?.toUpperCase() || 'ACTIVE';
 
-  let urgencyLabel = '';
   switch (reminderType) {
     case '30_day':
-      urgencyLabel = '📅 30-Day Advance Expiry Notice';
-      break;
-    case '15_day':
-      urgencyLabel = '⏳ 15-Day Expiry Notice';
-      break;
-    case '7_day':
-      urgencyLabel = '⚠️ 7-Day Urgent Expiry Notice';
-      break;
-    case 'expiry':
-      urgencyLabel = '🚨 Final Notice: Token Expires Today';
-      break;
-  }
+      return (
+        `*Royal Services — 30-Day Advance Notice* 📅\n\n` +
+        `Hello *${agentName}*,\n\n` +
+        `This is a friendly heads-up that your service token is expiring in *30 days*. Now is the perfect time to start your renewal process to avoid any last-minute rush.\n\n` +
+        `*Token Details:*\n` +
+        `• Token No: ${tokenNo}\n` +
+        `• Associate / Client: ${associateName}\n` +
+        `• Property: ${propertyName}\n` +
+        `• Start Date: ${startDate}\n` +
+        `• Expiry Date: ${endDate}\n` +
+        `• Status: ${status}\n\n` +
+        `📎 View full details & documents:\n${trackingUrl}\n\n` +
+        `Please contact the Royal Services office at your earliest convenience to initiate renewal.\n\n` +
+        `_Royal Services Administration Portal_`
+      );
 
-  return (
-    `*Royal Services - Token Expiry Reminder*\n\n` +
-    `${urgencyLabel}\n\n` +
-    `Hello *${token.agent?.name || 'Agent'}*,\n\n` +
-    `This is an automated reminder regarding your assigned service token:\n\n` +
-    `• *Token Number:* ${token.token_number}\n` +
-    `• *Associate / Client:* ${token.associate_name}\n` +
-    `• *Property:* ${token.property?.name || 'Assigned Property'}\n` +
-    `• *Start Date:* ${formatReadableISTDate(token.start_date)}\n` +
-    `• *End Date:* ${formatReadableISTDate(token.end_date)}\n` +
-    `• *Current Status:* ${token.computed_status?.toUpperCase() || 'ACTIVE'}\n\n` +
-    `Track official details and public documents:\n` +
-    `${trackingUrl}\n\n` +
-    `Please coordinate with the administration before the end date if renewal is required.\n\n` +
-    `_Royal Services Administration Portal_`
-  );
+    case '15_day':
+      return (
+        `*Royal Services — 15-Day Reminder* ⏳\n\n` +
+        `Hello *${agentName}*,\n\n` +
+        `Your service token will expire in *15 days*. Please ensure your renewal paperwork is in progress to avoid any disruption to your services.\n\n` +
+        `*Token Details:*\n` +
+        `• Token No: ${tokenNo}\n` +
+        `• Associate / Client: ${associateName}\n` +
+        `• Property: ${propertyName}\n` +
+        `• Expiry Date: *${endDate}*\n` +
+        `• Status: ${status}\n\n` +
+        `📎 Track your token:\n${trackingUrl}\n\n` +
+        `For queries or to submit renewal documents, contact the Royal Services office immediately.\n\n` +
+        `_Royal Services Administration Portal_`
+      );
+
+    case '7_day':
+      return (
+        `*Royal Services — ⚠️ URGENT: 7-Day Expiry Warning*\n\n` +
+        `Hello *${agentName}*,\n\n` +
+        `*ACTION REQUIRED:* Your service token expires in just *7 days*. Failure to renew before the expiry date may result in suspension of associated services.\n\n` +
+        `*Token Details:*\n` +
+        `• Token No: ${tokenNo}\n` +
+        `• Associate / Client: ${associateName}\n` +
+        `• Property: ${propertyName}\n` +
+        `• Expiry Date: *${endDate}* ⚠️\n` +
+        `• Status: ${status}\n\n` +
+        `📎 Track your token:\n${trackingUrl}\n\n` +
+        `⚡ Please visit the Royal Services office *today* or contact us urgently to complete your renewal before the deadline.\n\n` +
+        `_Royal Services Administration Portal_`
+      );
+
+    case 'expiry':
+      return (
+        `*Royal Services — 🚨 FINAL NOTICE: Token Expires TODAY*\n\n` +
+        `Hello *${agentName}*,\n\n` +
+        `Your service token has *expired today* or expires at end of day. Immediate action is required to prevent service interruption.\n\n` +
+        `*Token Details:*\n` +
+        `• Token No: ${tokenNo}\n` +
+        `• Associate / Client: ${associateName}\n` +
+        `• Property: ${propertyName}\n` +
+        `• Expiry Date: *${endDate}* 🚨\n` +
+        `• Status: ${status}\n\n` +
+        `📎 Track your token:\n${trackingUrl}\n\n` +
+        `🚨 *Please contact the Royal Services office IMMEDIATELY* to process your renewal and avoid service suspension.\n\n` +
+        `_Royal Services Administration Portal_`
+      );
+  }
 }
+
+
 
 /**
  * Sends a WhatsApp expiry reminder via Meta WhatsApp Business Cloud API
