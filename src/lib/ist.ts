@@ -164,3 +164,14 @@ export function getDaysUntilExpiry(endDateStr: string): number {
   const today = getCurrentISTDateString();
   return diffCalendarDays(today, endDateStr);
 }
+
+/**
+ * Checks if a reminder configured for a specific number of days before expiry is due today in IST
+ */
+export function isReminderDueTodayForDays(endDateStr: string, daysBefore: number): boolean {
+  const today = getCurrentISTDateString();
+  const end = parseISTDate(endDateStr);
+  const targetDate = new Date(end);
+  targetDate.setDate(targetDate.getDate() - daysBefore);
+  return formatToYYYYMMDD(targetDate) === today;
+}

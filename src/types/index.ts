@@ -150,3 +150,21 @@ export interface DashboardMetrics {
   recent_failures: number;
   recent_deliveries: number;
 }
+
+export interface ReminderDepartureRule {
+  id: string; // e.g. '30_day', '15_day', '7_day', 'expiry', or 'custom_X'
+  days_before_expiry: number; // e.g. 30, 15, 7, 0
+  label: string; // e.g. '30-Day Advance Notice'
+  is_active: boolean;
+  message_template: string;
+  meta_template_name?: string;
+  meta_template_language?: string;
+  updated_at?: string;
+}
+
+export interface TemplatePlaceholder {
+  key: string;
+  label: string;
+  description: string;
+  example: string;
+}

@@ -11,6 +11,8 @@ import {
   TokenStatus,
   ReminderType,
   DeliveryStatus,
+  ReminderDepartureRule,
+  TemplatePlaceholder,
 } from '@/types';
 import {
   INITIAL_AGENTS,
@@ -24,8 +26,13 @@ import {
   computeTokenStatus,
   getCurrentISTDateString,
   isReminderDueToday,
+  isReminderDueTodayForDays,
+  formatReadableISTDate,
+  getDaysUntilExpiry,
 } from './ist';
 
+// Global server-side singleton state for seamless local/preview execution
+// preserving changes across Next.js server invocations
 // Global server-side singleton state for seamless local/preview execution
 // preserving changes across Next.js server invocations
 declare global {
@@ -37,8 +44,137 @@ declare global {
     attachments: Attachment[];
     reminders: Reminder[];
     activityLogs: ActivityLog[];
+    departureRules: ReminderDepartureRule[];
   } | undefined;
 }
+
+export const AVAILABLE_PLACEHOLDERS: TemplatePlaceholder[] = [
+  { key: '{{agent_name}}', label: 'Agent Name', description: 'Assigned agent name', example: 'Ramesh Patel' },
+  { key: '{{token_number}}', label: 'Token Number', description: 'Official token identifier', example: 'RS-2026-001' },
+  { key: '{{associate_name}}', label: 'Associate / Client', description: 'Client or associate name', example: 'Apex Logistics Ltd' },
+  { key: '{{property}}', label: 'Property Name', description: 'Assigned property or site', example: 'Imperial Heights, Mumbai' },
+  { key: '{{start_date}}', label: 'Start Date', description: 'Token start date in readable IST format', example: '01 Sep 2026' },
+  { key: '{{expiry_date}}', label: 'Expiry Date', description: 'Token expiry date in readable IST format', example: '30 Oct 2026' },
+  { key: '{{status}}', label: 'Token Status', description: 'Computed status in uppercase', example: 'ACTIVE' },
+  { key: '{{tracking_url}}', label: 'Public Tracking Link', description: 'Direct URL to view/track token', example: 'https://rsagentapp.vercel.app/track/RS-2026-001' },
+  { key: '{{days_left}}', label: 'Days Remaining', description: 'Number of calendar days until expiry', example: '30' },
+];
+
+export const DEFAULT_DEPARTURE_RULES: ReminderDepartureRule[] = [
+  {
+    id: '30_day',
+    days_before_expiry: 30,
+    label: '30-Day Advance Notice',
+    is_active: true,
+    message_template:
+`*Royal Services — 30-Day Advance Notice* 📅
+
+Hello *{{agent_name}}*,
+
+This is a friendly heads-up that your service token is expiring in *30 days*. Now is the perfect time to start your renewal process to avoid any last-minute rush.
+
+*Token Details:*
+• Token No: {{token_number}}
+• Associate / Client: {{associate_name}}
+• Property: {{property}}
+• Start Date: {{start_date}}
+• Expiry Date: {{expiry_date}}
+• Status: {{status}}
+
+📎 View full details & documents:
+{{tracking_url}}
+
+Please contact the Royal Services office at your earliest convenience to initiate renewal.
+
+_Royal Services Administration Portal_`,
+    meta_template_name: 'royal_services_notification',
+    meta_template_language: 'en_US',
+  },
+  {
+    id: '15_day',
+    days_before_expiry: 15,
+    label: '15-Day Reminder',
+    is_active: true,
+    message_template:
+`*Royal Services — 15-Day Reminder* ⏳
+
+Hello *{{agent_name}}*,
+
+Your service token will expire in *15 days*. Please ensure your renewal paperwork is in progress to avoid any disruption to your services.
+
+*Token Details:*
+• Token No: {{token_number}}
+• Associate / Client: {{associate_name}}
+• Property: {{property}}
+• Expiry Date: *{{expiry_date}}*
+• Status: {{status}}
+
+📎 Track your token:
+{{tracking_url}}
+
+For queries or to submit renewal documents, contact the Royal Services office immediately.
+
+_Royal Services Administration Portal_`,
+    meta_template_name: 'royal_services_notification',
+    meta_template_language: 'en_US',
+  },
+  {
+    id: '7_day',
+    days_before_expiry: 7,
+    label: '7-Day Urgent Warning',
+    is_active: true,
+    message_template:
+`*Royal Services — ⚠️ URGENT: 7-Day Expiry Warning*
+
+Hello *{{agent_name}}*,
+
+*ACTION REQUIRED:* Your service token expires in just *7 days*. Failure to renew before the expiry date may result in suspension of associated services.
+
+*Token Details:*
+• Token No: {{token_number}}
+• Associate / Client: {{associate_name}}
+• Property: {{property}}
+• Expiry Date: *{{expiry_date}}* ⚠️
+• Status: {{status}}
+
+📎 Track your token:
+{{tracking_url}}
+
+⚡ Please visit the Royal Services office *today* or contact us urgently to complete your renewal before the deadline.
+
+_Royal Services Administration Portal_`,
+    meta_template_name: 'royal_services_notification',
+    meta_template_language: 'en_US',
+  },
+  {
+    id: 'expiry',
+    days_before_expiry: 0,
+    label: 'Expiry Day Final Notice',
+    is_active: true,
+    message_template:
+`*Royal Services — 🚨 FINAL NOTICE: Token Expires TODAY*
+
+Hello *{{agent_name}}*,
+
+Your service token has *expired today* or expires at end of day. Immediate action is required to prevent service interruption.
+
+*Token Details:*
+• Token No: {{token_number}}
+• Associate / Client: {{associate_name}}
+• Property: {{property}}
+• Expiry Date: *{{expiry_date}}* 🚨
+• Status: {{status}}
+
+📎 Track your token:
+{{tracking_url}}
+
+🚨 *Please contact the Royal Services office IMMEDIATELY* to process your renewal and avoid service suspension.
+
+_Royal Services Administration Portal_`,
+    meta_template_name: 'royal_services_notification',
+    meta_template_language: 'en_US',
+  },
+];
 
 function getStore() {
   if (!globalThis.__rsStore) {
@@ -49,7 +185,10 @@ function getStore() {
       attachments: JSON.parse(JSON.stringify(INITIAL_ATTACHMENTS)),
       reminders: JSON.parse(JSON.stringify(INITIAL_REMINDERS)),
       activityLogs: JSON.parse(JSON.stringify(INITIAL_ACTIVITY_LOGS)),
+      departureRules: JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES)),
     };
+  } else if (!globalThis.__rsStore.departureRules) {
+    globalThis.__rsStore.departureRules = JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES));
   }
   return globalThis.__rsStore;
 }
@@ -62,6 +201,7 @@ export function clearStore() {
     attachments: [],
     reminders: [],
     activityLogs: [],
+    departureRules: JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES)),
   };
   return globalThis.__rsStore;
 }
@@ -996,38 +1136,117 @@ export function updateReminderDeliveryStatus(
 }
 
 /**
+ * Renders custom message template by substituting dynamic placeholders with token data
+ */
+export function renderTemplateText(templateText: string, token: Partial<Token>, daysLeft?: number): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://rsagentapp.vercel.app';
+  const trackingUrl = `${appUrl}/track/${encodeURIComponent(token.token_number || '')}`;
+  const agentName = token.agent?.name || 'Agent';
+  const tokenNo = token.token_number || 'RS-XXXX';
+  const associateName = token.associate_name || 'Client';
+  const propertyName = token.property?.name || 'Assigned Property';
+  const startDate = token.start_date ? formatReadableISTDate(token.start_date) : '—';
+  const endDate = token.end_date ? formatReadableISTDate(token.end_date) : '—';
+  const status = token.computed_status?.toUpperCase() || 'ACTIVE';
+  const days = daysLeft !== undefined ? String(daysLeft) : (token.end_date ? String(getDaysUntilExpiry(token.end_date)) : '0');
+
+  return templateText
+    .replace(/\{\{agent_name\}\}/g, agentName)
+    .replace(/\{\{token_number\}\}/g, tokenNo)
+    .replace(/\{\{associate_name\}\}/g, associateName)
+    .replace(/\{\{property\}\}/g, propertyName)
+    .replace(/\{\{start_date\}\}/g, startDate)
+    .replace(/\{\{expiry_date\}\}/g, endDate)
+    .replace(/\{\{status\}\}/g, status)
+    .replace(/\{\{tracking_url\}\}/g, trackingUrl)
+    .replace(/\{\{days_left\}\}/g, days);
+}
+
+/**
+ * Returns all configured departure rules (from store or defaults)
+ */
+export function getReminderDepartureRules(): ReminderDepartureRule[] {
+  const store = getStore();
+  if (!store.departureRules || store.departureRules.length === 0) {
+    store.departureRules = JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES));
+  }
+  return store.departureRules;
+}
+
+/**
+ * Retrieves a single departure rule by ID (e.g. '30_day', '15_day', '7_day', 'expiry', or custom)
+ */
+export function getDepartureRuleById(id: string): ReminderDepartureRule | undefined {
+  const rules = getReminderDepartureRules();
+  return rules.find(r => r.id === id);
+}
+
+/**
+ * Saves and updates the reminder departure rules schedule and templates
+ */
+export function saveReminderDepartureRules(rules: ReminderDepartureRule[]): ReminderDepartureRule[] {
+  const store = getStore();
+  store.departureRules = rules.map(r => ({
+    ...r,
+    updated_at: new Date().toISOString(),
+  }));
+  recordActivityLog({
+    action: 'update_departure_rules',
+    target_type: 'reminder',
+    target_id: 'system',
+    summary: `Updated WhatsApp reminder departure schedule with ${rules.length} milestone(s).`,
+  });
+  return store.departureRules;
+}
+
+/**
+ * Resets departure rules and templates to initial system defaults
+ */
+export function resetReminderDepartureRules(): ReminderDepartureRule[] {
+  const store = getStore();
+  store.departureRules = JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES));
+  recordActivityLog({
+    action: 'reset_departure_rules',
+    target_type: 'reminder',
+    target_id: 'system',
+    summary: 'Reset WhatsApp reminder departure rules and templates to default.',
+  });
+  return store.departureRules;
+}
+
+/**
  * Runs the daily IST expiry reminder evaluation
+ * Evaluates active departure rules dynamically (e.g. 30, 15, 7, 0 days, or custom)
  * Idempotent: Does not resend already sent reminders for the current schedule
  */
 export async function runDailyReminderEvaluation(senderFn: (token: Token, reminderType: ReminderType) => Promise<{ success: boolean; providerId?: string; error?: string }>) {
   const store = getStore();
-  const today = getCurrentISTDateString();
   const eligibleTokens = store.tokens
     .filter(t => !t.is_archived && !t.status_override)
     .map(populateTokenRelations);
 
   const results = [];
-  const reminderTypes: ReminderType[] = ['30_day', '15_day', '7_day', 'expiry'];
+  const rules = getReminderDepartureRules().filter(r => r.is_active);
 
   for (const token of eligibleTokens) {
-    for (const rType of reminderTypes) {
-      if (isReminderDueToday(token.end_date, rType)) {
+    for (const rule of rules) {
+      if (isReminderDueTodayForDays(token.end_date, rule.days_before_expiry)) {
         // Idempotency check: has this non-manual reminder already been recorded for today/type?
         const alreadySent = store.reminders.some(
-          r => r.token_id === token.id && r.reminder_type === rType && !r.is_manual_resend
+          r => r.token_id === token.id && r.reminder_type === rule.id && !r.is_manual_resend
         );
 
         if (!alreadySent) {
-          const sendResult = await senderFn(token, rType);
+          const sendResult = await senderFn(token, rule.id as ReminderType);
           const rec = recordReminderAttempt({
             token_id: token.id,
-            reminder_type: rType,
+            reminder_type: rule.id as ReminderType,
             delivery_status: sendResult.success ? 'sent' : 'failed',
             provider_message_id: sendResult.providerId,
             failure_reason: sendResult.error,
             is_manual_resend: false,
           });
-          results.push({ token: token.token_number, reminderType: rType, result: rec });
+          results.push({ token: token.token_number, reminderType: rule.id, result: rec });
         }
       }
     }

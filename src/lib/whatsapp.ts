@@ -1,6 +1,6 @@
 import { Token, ReminderType } from '@/types';
 import { formatReadableISTDate } from './ist';
-import { getWhatsAppToken, getWhatsAppPhoneNumberId } from './store';
+import { getWhatsAppToken, getWhatsAppPhoneNumberId, getDepartureRuleById, renderTemplateText } from './store';
 
 const GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION || 'v25.0';
 
@@ -14,8 +14,14 @@ export interface WhatsAppSendResult {
 /**
  * Generates the reminder message content according to PRD section 7.2:
  * "Reminder content includes token number, property name, relevant dates, current status, and public tracking link."
+ * Uses configured dynamic departure template if available, or falls back to built-in defaults.
  */
 export function buildReminderMessageText(token: Token, reminderType: ReminderType): string {
+  const rule = getDepartureRuleById(reminderType);
+  if (rule && rule.message_template) {
+    return renderTemplateText(rule.message_template, token, rule.days_before_expiry);
+  }
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://rsagentapp.vercel.app';
   const trackingUrl = `${appUrl}/track/${encodeURIComponent(token.token_number)}`;
   const agentName = token.agent?.name || 'Agent';

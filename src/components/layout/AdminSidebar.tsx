@@ -16,6 +16,8 @@ import {
   Menu,
   X,
   ShieldCheck,
+  MessageSquareQuote,
+  FileCode2,
 } from 'lucide-react';
 import { RoyalLogo } from '@/components/brand/RoyalLogo';
 
@@ -32,6 +34,8 @@ export function AdminSidebar() {
     { name: 'Agents', href: '/admin/agents', icon: Users },
     { name: 'Properties', href: '/admin/properties', icon: Building2 },
     { name: 'Activity & WhatsApp', href: '/admin/activity', icon: History },
+    { name: 'Templates & Schedule', href: '/admin/templates', icon: MessageSquareQuote },
+    { name: 'Meta OpenAPI', href: '/admin/openapi', icon: FileCode2 },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
   ];
 
