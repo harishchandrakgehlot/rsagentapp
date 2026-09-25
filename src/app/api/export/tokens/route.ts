@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTokens, getArchivedTokens } from '@/lib/store';
+import { getTokens, getArchivedTokens, syncStoreFromCloud } from '@/lib/store';
 import { generateTokenCSV } from '@/lib/export';
 import { getSuperAdminSession } from '@/lib/auth';
 import { TokenStatus } from '@/types';
@@ -11,6 +11,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const { searchParams } = new URL(request.url);
     const scope = searchParams.get('scope') || 'all';
     const status = (searchParams.get('status') || 'all') as TokenStatus | 'all';

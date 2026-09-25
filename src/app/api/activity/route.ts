@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getActivityLogs } from '@/lib/store';
+import { getActivityLogs, syncStoreFromCloud } from '@/lib/store';
 import { getSuperAdminSession } from '@/lib/auth';
 
 export async function GET(request: Request) {
@@ -9,6 +9,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const { searchParams } = new URL(request.url);
     const targetType = searchParams.get('targetType') || undefined;
     const action = searchParams.get('action') || undefined;

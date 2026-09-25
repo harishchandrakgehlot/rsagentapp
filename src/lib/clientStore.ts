@@ -68,3 +68,38 @@ export function addCachedProperty(prop: Property) {
     setCachedProperties(updated);
   } catch {}
 }
+
+const TOKENS_KEY = 'rs_cached_tokens_v1';
+
+export function getCachedTokens(): import('@/types').Token[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(TOKENS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setCachedTokens(tokens: import('@/types').Token[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(TOKENS_KEY, JSON.stringify(tokens));
+  } catch {}
+}
+
+export function addCachedToken(token: import('@/types').Token) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getCachedTokens();
+    const existingIdx = current.findIndex(t => t.id === token.id || t.token_number === token.token_number);
+    let updated: import('@/types').Token[];
+    if (existingIdx >= 0) {
+      updated = current.map((t, i) => (i === existingIdx ? token : t));
+    } else {
+      updated = [token, ...current];
+    }
+    setCachedTokens(updated);
+  } catch {}
+}
+

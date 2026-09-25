@@ -31,6 +31,7 @@ import {
   getCachedProperties,
   setCachedProperties,
   addCachedProperty,
+  addCachedToken,
 } from '@/lib/clientStore';
 
 interface Props {
@@ -546,6 +547,10 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to save token');
+      }
+
+      if (data.token) {
+        addCachedToken(data.token);
       }
 
       router.push(`/admin/tokens/${data.token.id}`);

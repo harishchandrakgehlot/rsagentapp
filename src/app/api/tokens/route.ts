@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTokens, createToken } from '@/lib/store';
+import { getTokens, createToken, syncStoreFromCloud, persistStoreToCloud } from '@/lib/store';
 import { getSuperAdminSession } from '@/lib/auth';
 import { TokenStatus } from '@/types';
 
@@ -9,6 +9,8 @@ export async function GET(request: Request) {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    await syncStoreFromCloud();
 
     const { searchParams } = new URL(request.url);
     const status = (searchParams.get('status') || 'all') as TokenStatus | 'all';
@@ -43,8 +45,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const body = await request.json();
     const token = createToken(body);
+    await persistStoreToCloud();
     return NextResponse.json({ success: true, token });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error creating token';

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDashboardMetrics, getTokens, getActivityLogs } from '@/lib/store';
+import { getDashboardMetrics, getTokens, getActivityLogs, syncStoreFromCloud } from '@/lib/store';
 import { getSuperAdminSession } from '@/lib/auth';
 
 export async function GET() {
@@ -9,6 +9,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const metrics = getDashboardMetrics();
     const recentTokens = getTokens({ includeArchived: false }).slice(0, 5);
     const recentActivity = getActivityLogs({ limit: 6 });

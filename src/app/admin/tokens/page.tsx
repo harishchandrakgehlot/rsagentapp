@@ -1,5 +1,5 @@
 import React from 'react';
-import { getTokens } from '@/lib/store';
+import { getTokens, syncStoreFromCloud } from '@/lib/store';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { TokenListTable } from '@/components/tokens/TokenListTable';
 import { Plus } from 'lucide-react';
@@ -7,6 +7,7 @@ import { Plus } from 'lucide-react';
 export const dynamic = 'force-dynamic';
 
 export default async function AdminTokensPage() {
+  await syncStoreFromCloud();
   const tokens = getTokens({ includeArchived: false });
 
   return (

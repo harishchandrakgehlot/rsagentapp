@@ -5,6 +5,8 @@ import {
   saveReminderDepartureRules,
   resetReminderDepartureRules,
   AVAILABLE_PLACEHOLDERS,
+  syncStoreFromCloud,
+  persistStoreToCloud,
 } from '@/lib/store';
 import { ReminderDepartureRule } from '@/types';
 
@@ -15,6 +17,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const rules = getReminderDepartureRules();
     return NextResponse.json({
       success: true,
@@ -34,6 +37,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const body = await request.json();
     const rules = body.rules;
 
@@ -77,6 +81,7 @@ export async function POST(request: Request) {
     }));
 
     const saved = saveReminderDepartureRules(cleanedRules);
+    await persistStoreToCloud();
 
     return NextResponse.json({
       success: true,
@@ -96,7 +101,9 @@ export async function DELETE() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const restored = resetReminderDepartureRules();
+    await persistStoreToCloud();
     return NextResponse.json({
       success: true,
       message: 'Departure schedule rules and message templates successfully restored to defaults.',

@@ -22,13 +22,33 @@ import {
 } from 'lucide-react';
 
 
+import { getCachedTokens, setCachedTokens } from '@/lib/clientStore';
+
 interface Props {
   initialTokens: Token[];
   isArchivedView?: boolean;
 }
 
 export function TokenListTable({ initialTokens, isArchivedView = false }: Props) {
-  const [tokens, setTokens] = useState<Token[]>(initialTokens);
+  const [tokens, setTokens] = useState<Token[]>(() => {
+    if (initialTokens && initialTokens.length > 0) return initialTokens;
+    if (!isArchivedView) {
+      const cached = getCachedTokens();
+      if (cached.length > 0) return cached;
+    }
+    return initialTokens || [];
+  });
+
+  const [prevInitialTokens, setPrevInitialTokens] = useState(initialTokens);
+  if (initialTokens !== prevInitialTokens) {
+    setPrevInitialTokens(initialTokens);
+    if (initialTokens && initialTokens.length > 0) {
+      setTokens(initialTokens);
+      if (!isArchivedView) {
+        setCachedTokens(initialTokens);
+      }
+    }
+  }
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<TokenStatus | 'all'>('all');
   const [startDateFilter, setStartDateFilter] = useState('');

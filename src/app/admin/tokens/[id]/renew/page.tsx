@@ -1,6 +1,6 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
-import { getTokenById, getRenewalDraftData } from '@/lib/store';
+import { getTokenById, getRenewalDraftData, syncStoreFromCloud } from '@/lib/store';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { TokenForm } from '@/components/tokens/TokenForm';
 
@@ -9,6 +9,7 @@ interface Props {
 }
 
 export default async function RenewTokenPage({ params }: Props) {
+  await syncStoreFromCloud();
   const { id } = await params;
   const token = getTokenById(id);
 

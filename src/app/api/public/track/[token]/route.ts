@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getPublicToken } from '@/lib/store';
+import { getPublicToken, syncStoreFromCloud } from '@/lib/store';
 
 export async function GET(
   request: Request,
   props: { params: Promise<{ token: string }> }
 ) {
   try {
+    await syncStoreFromCloud();
     const params = await props.params;
     const tokenNumber = decodeURIComponent(params.token);
 

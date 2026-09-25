@@ -18,6 +18,7 @@ import {
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { put } from '@vercel/blob';
 import {
   INITIAL_AGENTS,
   INITIAL_PROPERTIES,
@@ -182,6 +183,11 @@ _Royal Services Administration Portal_`,
 ];
 
 const STORE_FILE = path.join(os.tmpdir(), 'rs_store_v1.json');
+const STORE_BLOB_PATH = 'rs_data/store_v1.json';
+const BLOB_PUBLIC_URL = 'https://qi8k31uwcevexgjk.public.blob.vercel-storage.com/rs_data/store_v1.json';
+
+let lastCloudSyncTime = 0;
+let isSyncingCloud = false;
 
 export function saveStoreToFile(storeData?: typeof globalThis.__rsStore) {
   try {
@@ -192,6 +198,81 @@ export function saveStoreToFile(storeData?: typeof globalThis.__rsStore) {
   } catch {
     // Ignore in environments where /tmp might be temporarily restricted
   }
+}
+
+export async function persistStoreToCloud(storeData?: typeof globalThis.__rsStore): Promise<void> {
+  const data = storeData || globalThis.__rsStore;
+  if (!data) return;
+
+  saveStoreToFile(data);
+
+  const hasBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL_OIDC_TOKEN);
+  if (!hasBlob) {
+    return;
+  }
+
+  try {
+    const payload = JSON.stringify(data);
+    await put(STORE_BLOB_PATH, payload, {
+      access: 'public',
+      addRandomSuffix: false,
+      allowOverwrite: true,
+    });
+    lastCloudSyncTime = Date.now();
+  } catch (err) {
+    console.warn('[store] Cloud persist error:', err);
+  }
+}
+
+export function notifyStoreChanged() {
+  saveStoreToFile(globalThis.__rsStore);
+  if (process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL_OIDC_TOKEN) {
+    persistStoreToCloud().catch(() => {});
+  }
+}
+
+export async function syncStoreFromCloud(force = false): Promise<typeof globalThis.__rsStore> {
+  const now = Date.now();
+  if (!force && globalThis.__rsStore && (now - lastCloudSyncTime < 2500)) {
+    return globalThis.__rsStore;
+  }
+
+  if (isSyncingCloud) {
+    return getStore();
+  }
+
+  isSyncingCloud = true;
+  try {
+    const res = await fetch(`${BLOB_PUBLIC_URL}?t=${now}`, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache, no-store' },
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data && typeof data === 'object') {
+        globalThis.__rsStore = {
+          agents: Array.isArray(data.agents) ? data.agents : (globalThis.__rsStore?.agents || []),
+          properties: Array.isArray(data.properties) ? data.properties : (globalThis.__rsStore?.properties || []),
+          tokens: Array.isArray(data.tokens) ? data.tokens : (globalThis.__rsStore?.tokens || []),
+          attachments: Array.isArray(data.attachments) ? data.attachments : (globalThis.__rsStore?.attachments || []),
+          reminders: Array.isArray(data.reminders) ? data.reminders : (globalThis.__rsStore?.reminders || []),
+          activityLogs: Array.isArray(data.activityLogs) ? data.activityLogs : (globalThis.__rsStore?.activityLogs || []),
+          departureRules: Array.isArray(data.departureRules) && data.departureRules.length > 0
+            ? data.departureRules
+            : (globalThis.__rsStore?.departureRules || JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES))),
+        };
+        saveStoreToFile(globalThis.__rsStore);
+        lastCloudSyncTime = Date.now();
+      }
+    }
+  } catch {
+    // Graceful offline fallback
+  } finally {
+    isSyncingCloud = false;
+  }
+
+  return getStore();
 }
 
 function loadStoreFromFile(): typeof globalThis.__rsStore | null {
@@ -243,7 +324,7 @@ export function clearStore() {
     activityLogs: [],
     departureRules: JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES)),
   };
-  saveStoreToFile(globalThis.__rsStore);
+  notifyStoreChanged();
   return globalThis.__rsStore;
 }
 
@@ -269,6 +350,7 @@ export function setWhatsAppConfig(config: Partial<WhatsAppIntegrationConfig>) {
   if (config.phoneNumberId !== undefined) storedWhatsAppConfig.phoneNumberId = config.phoneNumberId.trim();
   if (config.businessAccountId !== undefined) storedWhatsAppConfig.businessAccountId = config.businessAccountId.trim();
   if (config.businessPhone !== undefined) storedWhatsAppConfig.businessPhone = config.businessPhone.trim();
+  notifyStoreChanged();
 }
 
 export function getWhatsAppConfig(): WhatsAppIntegrationConfig {
@@ -643,6 +725,7 @@ export function createPropertyWithAddress(addr: PropertyAddress & { name?: strin
     existing.state = addr.state?.trim() || existing.state;
     existing.postal_code = addr.postal_code?.trim() || existing.postal_code;
     existing.country = addr.country?.trim() || existing.country || 'India';
+    notifyStoreChanged();
     return existing;
   }
 
@@ -1425,6 +1508,7 @@ export function recordActivityLog(data: {
   };
 
   store.activityLogs.unshift(log);
+  notifyStoreChanged();
   return log;
 }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { getArchivedTokens } from '@/lib/store';
+import { getArchivedTokens, syncStoreFromCloud } from '@/lib/store';
 import { AdminHeader } from '@/components/layout/AdminHeader';
 import { TokenListTable } from '@/components/tokens/TokenListTable';
 import { ShieldCheck } from 'lucide-react';
@@ -8,6 +8,7 @@ import { ShieldCheck } from 'lucide-react';
 export const dynamic = 'force-dynamic';
 
 export default async function AdminArchivePage() {
+  await syncStoreFromCloud();
   const archivedTokens = getArchivedTokens();
 
   return (

@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { getPublicToken } from '@/lib/store';
+import { getPublicToken, syncStoreFromCloud } from '@/lib/store';
 import { PublicHeader, PublicFooter } from '@/components/layout/PublicHeader';
 import { TokenStatusBadge } from '@/components/tokens/TokenStatusBadge';
 import { formatReadableISTDate } from '@/lib/ist';
@@ -22,6 +22,7 @@ interface Props {
 }
 
 export default async function PublicTokenTrackPage({ params }: Props) {
+  await syncStoreFromCloud();
   const { token: rawToken } = await params;
   const tokenNumber = decodeURIComponent(rawToken);
 

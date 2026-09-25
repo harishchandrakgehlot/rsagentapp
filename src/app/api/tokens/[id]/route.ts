@@ -5,6 +5,8 @@ import {
   archiveToken,
   restoreToken,
   getRemindersByToken,
+  syncStoreFromCloud,
+  persistStoreToCloud,
 } from '@/lib/store';
 import { getSuperAdminSession } from '@/lib/auth';
 
@@ -18,6 +20,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const params = await props.params;
     const token = getTokenById(params.id);
     if (!token) {
@@ -43,20 +46,24 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const params = await props.params;
     const body = await request.json();
 
     if (body.action === 'archive') {
       const token = archiveToken(params.id);
+      await persistStoreToCloud();
       return NextResponse.json({ success: true, token });
     }
 
     if (body.action === 'restore') {
       const token = restoreToken(params.id);
+      await persistStoreToCloud();
       return NextResponse.json({ success: true, token });
     }
 
     const token = updateToken(params.id, body);
+    await persistStoreToCloud();
     return NextResponse.json({ success: true, token });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error updating token';

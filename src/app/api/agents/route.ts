@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getAgents, createAgent, updateAgent, toggleAgentStatus } from '@/lib/store';
+import {
+  getAgents,
+  createAgent,
+  updateAgent,
+  toggleAgentStatus,
+  syncStoreFromCloud,
+  persistStoreToCloud,
+} from '@/lib/store';
 import { getSuperAdminSession } from '@/lib/auth';
 
 export async function GET(request: Request) {
+  await syncStoreFromCloud();
   const { searchParams } = new URL(request.url);
   const includeInactive = searchParams.get('includeInactive') === 'true';
   const agents = getAgents(includeInactive);
@@ -16,12 +24,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const { name, mobile } = await request.json();
     if (!name || !mobile) {
       return NextResponse.json({ error: 'Name and mobile number are required.' }, { status: 400 });
     }
 
     const agent = createAgent({ name, mobile });
+    await persistStoreToCloud();
     return NextResponse.json({ success: true, agent });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error creating agent';
@@ -36,6 +46,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const { id, name, mobile, is_active, toggle } = await request.json();
     if (!id) {
       return NextResponse.json({ error: 'Agent ID is required.' }, { status: 400 });
@@ -43,10 +54,12 @@ export async function PUT(request: Request) {
 
     if (toggle) {
       const agent = toggleAgentStatus(id);
+      await persistStoreToCloud();
       return NextResponse.json({ success: true, agent });
     }
 
     const agent = updateAgent(id, { name, mobile, is_active });
+    await persistStoreToCloud();
     return NextResponse.json({ success: true, agent });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error updating agent';

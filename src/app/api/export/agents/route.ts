@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAgents } from '@/lib/store';
+import { getAgents, syncStoreFromCloud } from '@/lib/store';
 import { generateAgentCSV } from '@/lib/export';
 import { getSuperAdminSession } from '@/lib/auth';
 
@@ -10,6 +10,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const { searchParams } = new URL(request.url);
     const includeInactive = searchParams.get('includeInactive') === 'true';
 

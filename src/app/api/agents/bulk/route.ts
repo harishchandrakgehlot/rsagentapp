@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { bulkImportAgents, BulkImportAgentInput } from '@/lib/store';
+import { bulkImportAgents, BulkImportAgentInput, syncStoreFromCloud, persistStoreToCloud } from '@/lib/store';
 import { getSuperAdminSession } from '@/lib/auth';
 
 export async function POST(request: Request) {
@@ -9,6 +9,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const body = await request.json();
     const items = body.agents as BulkImportAgentInput[];
 
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
     }
 
     const result = bulkImportAgents(items);
+    await persistStoreToCloud();
     return NextResponse.json(result);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error executing bulk import';

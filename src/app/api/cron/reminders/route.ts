@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runDailyReminderEvaluation, recordActivityLog } from '@/lib/store';
+import { runDailyReminderEvaluation, recordActivityLog, syncStoreFromCloud, persistStoreToCloud } from '@/lib/store';
 import { sendWhatsAppReminder } from '@/lib/whatsapp';
 
 export async function GET(request: Request) {
@@ -19,6 +19,8 @@ async function handleCron(request: Request) {
       return NextResponse.json({ error: 'Unauthorized cron trigger' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
+
     const results = await runDailyReminderEvaluation(async (token, rType) => {
       return await sendWhatsAppReminder(token, rType);
     });
@@ -30,6 +32,8 @@ async function handleCron(request: Request) {
       summary: `Daily IST reminder job evaluated. Dispatched ${results.length} reminder message(s).`,
       details: { processed: results },
     });
+
+    await persistStoreToCloud();
 
     return NextResponse.json({
       success: true,
