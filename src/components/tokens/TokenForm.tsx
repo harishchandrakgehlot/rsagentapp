@@ -439,7 +439,8 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
     }
 
     const primaryRec = validRecipients.find(r => r.is_primary) || validRecipients[0];
-    const resolvedAgentId = primaryRec.agent_id || agentId || agents[0]?.id || 'ag-default';
+    const resolvedAgentId = primaryRec.agent_id || agentId || agents[0]?.id || undefined;
+    const resolvedAgentName = primaryRec.name?.trim() || undefined;
     const resolvedMobile = primaryRec.mobile.trim();
 
     const hasAddress = (plotHouseNo.trim() || addressLine1.trim()) && city.trim();
@@ -484,6 +485,7 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
         token_number: normNumber,
         associate_name: associateName.trim(),
         agent_id: resolvedAgentId,
+        agent_name: resolvedAgentName,
         agent_mobile_number: resolvedMobile,
         assigned_recipients: validRecipients.map(r => ({
           agent_id: r.agent_id || undefined,
@@ -491,6 +493,7 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
           mobile: r.mobile.trim(),
           is_primary: r.id === primaryRec.id,
         })),
+
         property_id: propertyId || undefined,
         property_address: propertyAddressPayload,
         start_date: startDate,

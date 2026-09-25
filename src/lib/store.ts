@@ -313,7 +313,53 @@ export function createAgent(data: { name: string; mobile: string }): Agent {
   return newAgent;
 }
 
+export function findOrCreateAgent(name: string, mobile: string): Agent {
+  const store = getStore();
+  let cleanMobile = mobile.trim();
+  try {
+    cleanMobile = normalizeAgentMobile(mobile);
+  } catch {
+    // retain trimmed if normalization fails
+  }
+
+  // 1. Try finding by clean mobile
+  let existing = store.agents.find(a => a.mobile === cleanMobile);
+  if (existing) {
+    return existing;
+  }
+
+  // 2. Try finding by matching digits (last 10 digits)
+  const digits = cleanMobile.replace(/\D/g, '').slice(-10);
+  if (digits.length === 10) {
+    existing = store.agents.find(a => a.mobile.replace(/\D/g, '').endsWith(digits));
+    if (existing) {
+      return existing;
+    }
+  }
+
+  // 3. Create new agent in master directory
+  const newAgent: Agent = {
+    id: `ag-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    name: name.trim() || 'Assigned Agent',
+    mobile: cleanMobile,
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  store.agents.push(newAgent);
+  recordActivityLog({
+    action: 'agent_created',
+    target_type: 'agent',
+    target_id: newAgent.id,
+    summary: `Created agent ${newAgent.name} (${newAgent.mobile}).`,
+  });
+
+  return newAgent;
+}
+
 export function updateAgent(id: string, updates: Partial<Pick<Agent, 'name' | 'mobile' | 'is_active'>>): Agent {
+
   const store = getStore();
   const index = store.agents.findIndex(a => a.id === id);
   if (index === -1) throw new Error('Agent not found');
@@ -750,7 +796,8 @@ export function getPublicToken(tokenNumber: string): PublicTokenView | null {
 export interface CreateTokenInput {
   token_number: string;
   associate_name: string;
-  agent_id: string;
+  agent_id?: string;
+  agent_name?: string;
   agent_mobile_number?: string;
   assigned_recipients?: TokenRecipient[];
   property_id?: string;
@@ -791,10 +838,23 @@ export function createToken(input: CreateTokenInput): Token {
     throw new Error('End Date cannot be earlier than Start Date');
   }
 
-  // Resolve Primary Agent
-  const agent = store.agents.find(a => a.id === input.agent_id);
+  // Resolve Primary Agent (by ID or auto-create/lookup by mobile & name)
+  let agent: Agent | undefined = undefined;
+  if (input.agent_id && input.agent_id !== 'ag-default') {
+    agent = store.agents.find(a => a.id === input.agent_id);
+  }
+
+  // If not found by ID, try finding or auto-creating by mobile and name
   if (!agent) {
-    throw new Error('Selected agent does not exist');
+    const rawMobile = input.agent_mobile_number?.trim() || input.assigned_recipients?.[0]?.mobile?.trim();
+    const rawName = input.agent_name?.trim() || input.assigned_recipients?.[0]?.name?.trim() || 'Assigned Agent';
+    if (rawMobile) {
+      agent = findOrCreateAgent(rawName, rawMobile);
+    } else if (store.agents.length > 0) {
+      agent = store.agents[0];
+    } else {
+      agent = findOrCreateAgent('Primary Agent', '+919819143222');
+    }
   }
 
   const mobileToUse = input.agent_mobile_number?.trim() || agent.mobile;
@@ -804,13 +864,20 @@ export function createToken(input: CreateTokenInput): Token {
   if (Array.isArray(input.assigned_recipients) && input.assigned_recipients.length > 0) {
     recipients = input.assigned_recipients
       .filter(r => r && r.mobile && r.mobile.trim())
-      .map((r, i) => ({
-        id: r.id || `rec-${Date.now()}-${i}`,
-        agent_id: r.agent_id || (i === 0 ? agent.id : undefined),
-        name: r.name?.trim() || (i === 0 ? agent.name : 'Recipient'),
-        mobile: r.mobile.trim(),
-        is_primary: Boolean(r.is_primary ?? i === 0),
-      }));
+      .map((r, i) => {
+        let recAgentId = r.agent_id;
+        if (!recAgentId || recAgentId === 'ag-default' || !store.agents.find(a => a.id === recAgentId)) {
+          const recAgent = findOrCreateAgent(r.name || 'Assigned Agent', r.mobile);
+          recAgentId = recAgent.id;
+        }
+        return {
+          id: r.id || `rec-${Date.now()}-${i}`,
+          agent_id: recAgentId || (i === 0 ? agent!.id : undefined),
+          name: r.name?.trim() || (i === 0 ? agent!.name : 'Recipient'),
+          mobile: r.mobile.trim(),
+          is_primary: Boolean(r.is_primary ?? i === 0),
+        };
+      });
   }
 
   // Default to primary agent if no recipient list provided
@@ -825,6 +892,7 @@ export function createToken(input: CreateTokenInput): Token {
       },
     ];
   }
+
 
   // Resolve Property (Structured Address or property_name or property_id)
   let propertyId = input.property_id;
