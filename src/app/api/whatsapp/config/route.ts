@@ -33,6 +33,19 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { token, phoneNumberId, businessAccountId, businessPhone } = body;
 
+    if (token !== undefined && token !== null) {
+      const trimmed = String(token).trim();
+      if (trimmed && (/[^\x20-\x7E]/.test(trimmed) || trimmed.startsWith('❌'))) {
+        return NextResponse.json(
+          {
+            error:
+              'Invalid Meta Access Token: The token contains invalid characters or an error message (starts with ❌). Please paste your actual Meta Access Token from the Meta App Dashboard.',
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     setWhatsAppConfig({
       token: token !== undefined ? token : undefined,
       phoneNumberId: phoneNumberId !== undefined ? phoneNumberId : undefined,

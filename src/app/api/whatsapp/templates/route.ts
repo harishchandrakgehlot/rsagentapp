@@ -21,6 +21,16 @@ export async function GET(request: Request) {
       );
     }
 
+    if (/[^\x20-\x7E]/.test(token) || token.startsWith('❌')) {
+      return NextResponse.json(
+        {
+          error:
+            'Invalid Meta Access Token: Token contains non-ASCII characters or an error message (starts with ❌).',
+        },
+        { status: 400 }
+      );
+    }
+
     const response = await fetch(
       `https://graph.facebook.com/v25.0/${wabaId}/message_templates?limit=100`,
       {

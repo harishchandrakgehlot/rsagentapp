@@ -17,11 +17,15 @@ import {
   Check,
   Sparkles,
   Edit3,
+  Eye,
+  EyeOff,
+  Trash2,
 } from 'lucide-react';
 
 export default function AdminSettingsPage() {
   const [testingCron, setTestingCron] = useState(false);
   const [cronResult, setCronResult] = useState<string | null>(null);
+  const [showToken, setShowToken] = useState(false);
 
   // Meta WhatsApp Config & Tester state
   const [testPhone, setTestPhone] = useState('');
@@ -63,8 +67,14 @@ export default function AdminSettingsPage() {
     try {
       const localToken = localStorage.getItem('rs_meta_token');
       if (localToken) {
-        setCustomToken(localToken);
-        setHasSavedToken(true);
+        if (/[^\x20-\x7E]/.test(localToken) || localToken.startsWith('❌')) {
+          localStorage.removeItem('rs_meta_token');
+          setCustomToken('');
+          setHasSavedToken(false);
+        } else {
+          setCustomToken(localToken);
+          setHasSavedToken(true);
+        }
       }
       const localPhoneId = localStorage.getItem('rs_meta_phone_id');
       if (localPhoneId) {
@@ -96,17 +106,43 @@ export default function AdminSettingsPage() {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
+  const handleClearToken = async () => {
+    try {
+      localStorage.removeItem('rs_meta_token');
+    } catch {}
+    setCustomToken('');
+    setHasSavedToken(false);
+    setTestMsgResult(null);
+    try {
+      await fetch('/api/whatsapp/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: '' }),
+      });
+    } catch {}
+  };
+
   const handleSaveToken = async () => {
-    if (!customToken.trim()) return;
+    const trimmed = customToken.trim();
+    if (!trimmed) return;
+
+    if (/[^\x20-\x7E]/.test(trimmed) || trimmed.startsWith('❌')) {
+      setTestMsgResult({
+        success: false,
+        message: '⚠️ Invalid Token: You have pasted an error message or non-ASCII characters (e.g. ❌) into the token field! Please clear the field and paste your actual Meta Access Token starting with "EAA...".',
+      });
+      return;
+    }
+
     setSavingToken(true);
     try {
       try {
-        localStorage.setItem('rs_meta_token', customToken.trim());
+        localStorage.setItem('rs_meta_token', trimmed);
       } catch {}
       const res = await fetch('/api/whatsapp/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: customToken.trim() }),
+        body: JSON.stringify({ token: trimmed }),
       });
       if (res.ok) {
         setHasSavedToken(true);
@@ -251,15 +287,26 @@ export default function AdminSettingsPage() {
     setTestMsgResult(null);
 
     try {
-      const tokenParam =
+      const tokenParam = (
         customToken.trim() ||
-        (typeof window !== 'undefined' ? localStorage.getItem('rs_meta_token') || undefined : undefined);
+        (typeof window !== 'undefined' ? localStorage.getItem('rs_meta_token') || '' : '')
+      ).trim();
+
+      if (tokenParam && (/[^\x20-\x7E]/.test(tokenParam) || tokenParam.startsWith('❌'))) {
+        setTestMsgResult({
+          success: false,
+          message: '⚠️ Invalid Token: The token field contains an error message or non-ASCII characters (e.g. ❌). Please click "Clear Token" and paste your real Meta Access Token starting with "EAA...".',
+        });
+        setSendingTestMsg(false);
+        return;
+      }
+
       const res = await fetch('/api/whatsapp/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           recipient: testPhone.trim(),
-          token: tokenParam,
+          token: tokenParam || undefined,
           phoneNumberId: phoneNumberId.trim() || undefined,
           mode: testMode,
           templateName: selectedTemplate,
@@ -610,18 +657,53 @@ export default function AdminSettingsPage() {
                 <label className="block text-[11px] font-semibold text-slate-700 uppercase mb-1">
                   Meta Access Token <span className="text-slate-400">(from &quot;Generate token&quot; in Meta)</span>
                 </label>
-                <input
-                  type="password"
-                  value={customToken}
-                  onChange={e => setCustomToken(e.target.value)}
-                  placeholder="Paste token starting with EAAB..."
-                  className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                />
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-[10px] text-slate-500">
-                    {hasSavedToken ? '✅ Active token stored' : 'No permanent token saved'}
-                  </span>
-                  {customToken.trim() && (
+                <div className="relative">
+                  <input
+                    type={showToken ? 'text' : 'password'}
+                    value={customToken}
+                    onChange={e => setCustomToken(e.target.value)}
+                    placeholder="Paste token starting with EAAB..."
+                    className={`w-full pl-3 pr-10 py-2 text-xs font-mono rounded-xl border focus:outline-none focus:ring-2 bg-white ${
+                      customToken && (/[^\x20-\x7E]/.test(customToken) || customToken.startsWith('❌'))
+                        ? 'border-rose-400 focus:ring-rose-500 bg-rose-50/30'
+                        : 'border-slate-300 focus:ring-emerald-500'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowToken(!showToken)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                    title={showToken ? 'Hide token' : 'Show token'}
+                  >
+                    {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                {customToken && (/[^\x20-\x7E]/.test(customToken) || customToken.startsWith('❌')) && (
+                  <p className="text-[10px] text-rose-700 bg-rose-50 border border-rose-200 p-1.5 rounded-lg mt-1 font-semibold flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 shrink-0 text-rose-600" />
+                    <span>Contains error message or invalid characters! Click &quot;Clear&quot; and paste your real token (starts with EAA...).</span>
+                  </p>
+                )}
+
+                <div className="flex items-center justify-between mt-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-500">
+                      {hasSavedToken ? '✅ Active token stored' : 'No permanent token saved'}
+                    </span>
+                    {(hasSavedToken || customToken) && (
+                      <button
+                        type="button"
+                        onClick={handleClearToken}
+                        className="text-[10px] text-rose-600 hover:text-rose-800 font-semibold inline-flex items-center gap-0.5 hover:underline"
+                        title="Clear saved token from memory and browser"
+                      >
+                        <Trash2 className="w-2.5 h-2.5" />
+                        <span>Clear</span>
+                      </button>
+                    )}
+                  </div>
+                  {customToken.trim() && !(customToken && (/[^\x20-\x7E]/.test(customToken) || customToken.startsWith('❌'))) && (
                     <button
                       type="button"
                       onClick={handleSaveToken}

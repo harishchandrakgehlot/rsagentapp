@@ -74,13 +74,19 @@ export async function sendWhatsAppReminder(
 
   // If live Meta credentials are provided, call Meta Cloud API
   if (tokenSecret && phoneNumberId) {
+    if (/[^\x20-\x7E]/.test(tokenSecret) || tokenSecret.startsWith('❌')) {
+      return {
+        success: false,
+        error: 'Invalid Meta Access Token: Token contains non-ASCII characters or an error message. Please re-enter it in Settings.',
+      };
+    }
     try {
       const response = await fetch(
         `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
         {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${tokenSecret}`,
+            Authorization: `Bearer ${tokenSecret.trim()}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -153,7 +159,7 @@ export async function sendDirectWhatsAppMessage({
     deliveredTemplate?: string;
   }
 > {
-  const tokenSecret = token || getWhatsAppToken();
+  const tokenSecret = (token || getWhatsAppToken() || '').trim();
   const phoneId = phoneNumberId || getWhatsAppPhoneNumberId();
   let recipient = to.replace(/\D/g, '');
   if (recipient.length === 10) {
@@ -166,6 +172,13 @@ export async function sendDirectWhatsAppMessage({
     return {
       success: false,
       error: 'Meta WhatsApp Access Token is missing. Click "Generate token" in Meta and enter it.',
+    };
+  }
+
+  if (/[^\x20-\x7E]/.test(tokenSecret) || tokenSecret.startsWith('❌')) {
+    return {
+      success: false,
+      error: 'Invalid Meta Access Token: The token field contains an error message or non-ASCII characters (e.g. ❌). Please clear the token input and paste your real token from Meta Developer Console (starts with "EAA...").',
     };
   }
 

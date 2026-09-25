@@ -26,6 +26,17 @@ export async function POST(request: Request) {
       );
     }
 
+    if (token && (/[^\x20-\x7E]/.test(token) || token.startsWith('❌'))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Invalid Meta Access Token: The token field contains an error message or non-ASCII characters (e.g. ❌). Please clear the token input and paste your actual Meta Access Token from the Meta App Dashboard.',
+        },
+        { status: 400 }
+      );
+    }
+
     const isTemplate = mode === 'template';
     const testBody =
       message ||

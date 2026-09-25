@@ -80,15 +80,21 @@ const storedWhatsAppConfig: Partial<WhatsAppIntegrationConfig> = {
 };
 
 export function setWhatsAppConfig(config: Partial<WhatsAppIntegrationConfig>) {
-  if (config.token !== undefined) storedWhatsAppConfig.token = config.token.trim();
+  if (config.token !== undefined) {
+    const t = config.token.trim();
+    storedWhatsAppConfig.token = (/[^\x20-\x7E]/.test(t) || t.startsWith('❌')) ? '' : t;
+  }
   if (config.phoneNumberId !== undefined) storedWhatsAppConfig.phoneNumberId = config.phoneNumberId.trim();
   if (config.businessAccountId !== undefined) storedWhatsAppConfig.businessAccountId = config.businessAccountId.trim();
   if (config.businessPhone !== undefined) storedWhatsAppConfig.businessPhone = config.businessPhone.trim();
 }
 
 export function getWhatsAppConfig(): WhatsAppIntegrationConfig {
+  const rawToken = storedWhatsAppConfig.token || process.env.META_WHATSAPP_TOKEN || '';
+  const cleanToken = (/[^\x20-\x7E]/.test(rawToken) || rawToken.startsWith('❌')) ? '' : rawToken;
+
   return {
-    token: storedWhatsAppConfig.token || process.env.META_WHATSAPP_TOKEN || '',
+    token: cleanToken,
     phoneNumberId: storedWhatsAppConfig.phoneNumberId || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1387005294491815',
     businessAccountId: storedWhatsAppConfig.businessAccountId || process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID || '2150898739182078',
     businessPhone: storedWhatsAppConfig.businessPhone || process.env.META_WHATSAPP_BUSINESS_PHONE || '919819143222',
