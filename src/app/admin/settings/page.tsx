@@ -47,7 +47,7 @@ export default function AdminSettingsPage() {
     verified_name?: string;
     quality_rating?: string;
   }> | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState('hello_world');
+  const [selectedTemplate, setSelectedTemplate] = useState('royal_services_notification');
   const [selectedTemplateLang, setSelectedTemplateLang] = useState('en_US');
   const [fetchingTemplates, setFetchingTemplates] = useState(false);
   const [detectedTemplates, setDetectedTemplates] = useState<Array<{

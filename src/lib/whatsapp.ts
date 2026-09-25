@@ -241,7 +241,7 @@ export async function sendDirectWhatsAppMessage({
       // If text message fails outside 24h window (code 131047), fall back to template cascade
       if (!response.ok && data.error?.code === 131047) {
         sentAs = 'template';
-        templateName = 'hello_world';
+        templateName = 'royal_services_notification';
       }
     }
 

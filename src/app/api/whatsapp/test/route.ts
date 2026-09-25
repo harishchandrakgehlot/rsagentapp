@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       body: isTemplate ? undefined : testBody,
       token,
       phoneNumberId,
-      templateName: isTemplate ? (templateName || 'hello_world') : undefined,
+      templateName: isTemplate ? (templateName || 'royal_services_notification') : undefined,
       templateLanguage: templateLanguage || 'en_US',
     });
 
