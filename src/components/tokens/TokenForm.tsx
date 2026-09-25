@@ -24,7 +24,14 @@ import {
   Loader2,
 } from 'lucide-react';
 import { getCurrentISTDateString } from '@/lib/ist';
-
+import {
+  getCachedAgents,
+  setCachedAgents,
+  addCachedAgent,
+  getCachedProperties,
+  setCachedProperties,
+  addCachedProperty,
+} from '@/lib/clientStore';
 
 interface Props {
   initialToken?: Token | null;
@@ -50,10 +57,11 @@ interface Props {
 export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
   const router = useRouter();
 
-  // Master lists
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [loadingMasters, setLoadingMasters] = useState(true);
+  // Master lists initialized from persistent cache
+  const [agents, setAgents] = useState<Agent[]>(() => getCachedAgents());
+  const [properties, setProperties] = useState<Property[]>(() => getCachedProperties());
+  const [loadingMasters, setLoadingMasters] = useState(false);
+
 
   // Modals for inline creation
   const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
@@ -174,14 +182,31 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
         ]);
         const agData = await agRes.json();
         const prData = await prRes.json();
-        const loadedProps: Property[] = prData.properties || [];
-        setAgents(agData.agents || []);
-        setProperties(loadedProps);
+        const serverAgents: Agent[] = agData.agents || [];
+        const serverProps: Property[] = prData.properties || [];
+
+        if (serverAgents.length > 0) {
+          setAgents(serverAgents);
+          setCachedAgents(serverAgents);
+        } else {
+          const localAgents = getCachedAgents();
+          if (localAgents.length > 0) setAgents(localAgents);
+        }
+
+        if (serverProps.length > 0) {
+          setProperties(serverProps);
+          setCachedProperties(serverProps);
+        } else {
+          const localProps = getCachedProperties();
+          if (localProps.length > 0) setProperties(localProps);
+        }
+
+        const effectiveProps = serverProps.length > 0 ? serverProps : getCachedProperties();
 
         // If editing or renewing, autofill address fields from the property
         const targetPropId = initialToken?.property_id || renewalDraft?.property_id;
         if (targetPropId) {
-          const matched = loadedProps.find(p => p.id === targetPropId);
+          const matched = effectiveProps.find(p => p.id === targetPropId);
           if (matched) {
             setPlotHouseNo(matched.plot_house_no || '');
             setAddressLine1(matched.address_line_1 || matched.name || '');
@@ -198,6 +223,7 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
       } finally {
         setLoadingMasters(false);
       }
+
     }
     loadData();
   }, [initialToken, renewalDraft]);
@@ -326,12 +352,15 @@ export function TokenForm({ initialToken, renewalDraft, isEdit }: Props) {
       ];
     });
     setAgentId(newAgent.id);
+    addCachedAgent(newAgent);
   };
 
 
   // Inline Property Creation Callback
   const handlePropertyCreated = (newProp: Property) => {
+    addCachedProperty(newProp);
     setProperties(prev => [...prev, newProp]);
+
     setPropertyId(newProp.id);
     setPlotHouseNo(newProp.plot_house_no || '');
     setAddressLine1(newProp.address_line_1 || newProp.name || '');

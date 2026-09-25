@@ -18,11 +18,12 @@ import {
   Power,
   ShieldCheck,
 } from 'lucide-react';
+import { getCachedAgents, setCachedAgents, addCachedAgent } from '@/lib/clientStore';
 
 export default function AdminAgentsPage() {
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agents, setAgents] = useState<Agent[]>(() => getCachedAgents());
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
@@ -31,7 +32,21 @@ export default function AdminAgentsPage() {
     try {
       const res = await fetch('/api/agents?includeInactive=true');
       const data = await res.json();
-      setAgents(data.agents || []);
+      const serverAgents: Agent[] = data.agents || [];
+      if (serverAgents.length > 0) {
+        setAgents(serverAgents);
+        setCachedAgents(serverAgents);
+      } else {
+        const local = getCachedAgents();
+        if (local.length > 0) {
+          setAgents(local);
+          await fetch('/api/agents/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agents: local.map(a => ({ name: a.name, mobile: a.mobile })) }),
+          });
+        }
+      }
     } catch (err) {
       console.error('Error loading agents', err);
     } finally {
@@ -43,10 +58,26 @@ export default function AdminAgentsPage() {
     let ignore = false;
     (async () => {
       try {
+        const local = getCachedAgents();
+        if (local.length > 0 && !ignore) {
+          setAgents(local);
+        }
         const res = await fetch('/api/agents?includeInactive=true');
         const data = await res.json();
+        const serverAgents: Agent[] = data.agents || [];
         if (!ignore) {
-          setAgents(data.agents || []);
+          if (serverAgents.length > 0) {
+            setAgents(serverAgents);
+            setCachedAgents(serverAgents);
+          } else if (local.length > 0) {
+            // Cold-start sync: server restarted with empty memory, restore local agents
+            setAgents(local);
+            await fetch('/api/agents/bulk', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ agents: local.map(a => ({ name: a.name, mobile: a.mobile })) }),
+            });
+          }
         }
       } catch (err) {
         console.error('Error loading agents', err);
@@ -62,6 +93,7 @@ export default function AdminAgentsPage() {
   }, []);
 
 
+
   const handleToggleStatus = async (agent: Agent) => {
     const actionName = agent.is_active ? 'deactivate' : 'reactivate';
     if (confirm(`Are you sure you want to ${actionName} agent "${agent.name}"? Historical tokens will remain attached.`)) {
@@ -73,8 +105,13 @@ export default function AdminAgentsPage() {
         });
         const data = await res.json();
         if (data.success) {
-          setAgents(prev => prev.map(a => (a.id === agent.id ? data.agent : a)));
+          setAgents(prev => {
+            const updated = prev.map(a => (a.id === agent.id ? data.agent : a));
+            setCachedAgents(updated);
+            return updated;
+          });
         }
+
       } catch (err) {
         console.error('Failed to toggle status', err);
       }
@@ -234,12 +271,22 @@ export default function AdminAgentsPage() {
           onClose={() => setShowModal(false)}
           agentToEdit={selectedAgent}
           onSuccess={saved => {
+            addCachedAgent(saved);
             if (selectedAgent) {
-              setAgents(prev => prev.map(a => (a.id === saved.id ? saved : a)));
+              setAgents(prev => {
+                const updated = prev.map(a => (a.id === saved.id ? saved : a));
+                setCachedAgents(updated);
+                return updated;
+              });
             } else {
-              setAgents(prev => [...prev, saved]);
+              setAgents(prev => {
+                const updated = [...prev, saved];
+                setCachedAgents(updated);
+                return updated;
+              });
             }
           }}
+
         />
       )}
 

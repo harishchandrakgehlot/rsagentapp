@@ -23,6 +23,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    if (Array.isArray(body.properties)) {
+      const created = body.properties.map((p: Parameters<typeof createPropertyWithAddress>[0]) => createPropertyWithAddress(p));
+      return NextResponse.json({ success: true, properties: created });
+    }
+
     let property;
     if (body.address_line_1 || body.plot_house_no || body.city) {
       property = createPropertyWithAddress(body);
@@ -33,6 +38,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true, property });
+
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Error creating property';
     return NextResponse.json({ error: msg }, { status: 500 });

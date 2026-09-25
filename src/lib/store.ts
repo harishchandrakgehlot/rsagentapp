@@ -15,6 +15,9 @@ import {
   TemplatePlaceholder,
   TokenRecipient,
 } from '@/types';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import {
   INITIAL_AGENTS,
   INITIAL_PROPERTIES,
@@ -23,6 +26,7 @@ import {
   INITIAL_REMINDERS,
   INITIAL_ACTIVITY_LOGS,
 } from './mockData';
+
 import {
   computeTokenStatus,
   getCurrentISTDateString,
@@ -177,19 +181,54 @@ _Royal Services Administration Portal_`,
   },
 ];
 
+const STORE_FILE = path.join(os.tmpdir(), 'rs_store_v1.json');
+
+export function saveStoreToFile(storeData?: typeof globalThis.__rsStore) {
+  try {
+    const data = storeData || globalThis.__rsStore;
+    if (data) {
+      fs.writeFileSync(STORE_FILE, JSON.stringify(data), 'utf8');
+    }
+  } catch {
+    // Ignore in environments where /tmp might be temporarily restricted
+  }
+}
+
+function loadStoreFromFile(): typeof globalThis.__rsStore | null {
+  try {
+    if (fs.existsSync(STORE_FILE)) {
+      const content = fs.readFileSync(STORE_FILE, 'utf8');
+      const parsed = JSON.parse(content);
+      if (parsed && Array.isArray(parsed.agents) && Array.isArray(parsed.properties)) {
+        return parsed;
+      }
+    }
+  } catch {
+    // Ignore corrupted file
+  }
+  return null;
+}
+
 function getStore() {
   if (!globalThis.__rsStore) {
-    globalThis.__rsStore = {
-      agents: JSON.parse(JSON.stringify(INITIAL_AGENTS)),
-      properties: JSON.parse(JSON.stringify(INITIAL_PROPERTIES)),
-      tokens: JSON.parse(JSON.stringify(INITIAL_TOKENS)),
-      attachments: JSON.parse(JSON.stringify(INITIAL_ATTACHMENTS)),
-      reminders: JSON.parse(JSON.stringify(INITIAL_REMINDERS)),
-      activityLogs: JSON.parse(JSON.stringify(INITIAL_ACTIVITY_LOGS)),
-      departureRules: JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES)),
-    };
+    const fromFile = loadStoreFromFile();
+    if (fromFile) {
+      globalThis.__rsStore = fromFile;
+    } else {
+      globalThis.__rsStore = {
+        agents: JSON.parse(JSON.stringify(INITIAL_AGENTS)),
+        properties: JSON.parse(JSON.stringify(INITIAL_PROPERTIES)),
+        tokens: JSON.parse(JSON.stringify(INITIAL_TOKENS)),
+        attachments: JSON.parse(JSON.stringify(INITIAL_ATTACHMENTS)),
+        reminders: JSON.parse(JSON.stringify(INITIAL_REMINDERS)),
+        activityLogs: JSON.parse(JSON.stringify(INITIAL_ACTIVITY_LOGS)),
+        departureRules: JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES)),
+      };
+      saveStoreToFile(globalThis.__rsStore);
+    }
   } else if (!globalThis.__rsStore.departureRules) {
     globalThis.__rsStore.departureRules = JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES));
+    saveStoreToFile(globalThis.__rsStore);
   }
   return globalThis.__rsStore;
 }
@@ -204,8 +243,10 @@ export function clearStore() {
     activityLogs: [],
     departureRules: JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES)),
   };
+  saveStoreToFile(globalThis.__rsStore);
   return globalThis.__rsStore;
 }
+
 
 export interface WhatsAppIntegrationConfig {
   token: string;

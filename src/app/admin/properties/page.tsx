@@ -15,23 +15,39 @@ import {
   ShieldCheck,
   Plus,
 } from 'lucide-react';
+import { getCachedProperties, setCachedProperties, addCachedProperty } from '@/lib/clientStore';
 
 export default function AdminPropertiesPage() {
-  const [properties, setProperties] = useState<Property[]>([]);
+  const [properties, setProperties] = useState<Property[]>(() => getCachedProperties());
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
-
 
   useEffect(() => {
     let ignore = false;
     (async () => {
       try {
+        const local = getCachedProperties();
+        if (local.length > 0 && !ignore) {
+          setProperties(local);
+        }
         const res = await fetch('/api/properties?includeInactive=true');
         const data = await res.json();
+        const serverProps: Property[] = data.properties || [];
         if (!ignore) {
-          setProperties(data.properties || []);
+          if (serverProps.length > 0) {
+            setProperties(serverProps);
+            setCachedProperties(serverProps);
+          } else if (local.length > 0) {
+            // Cold-start sync: server restarted with empty memory, restore local properties
+            setProperties(local);
+            await fetch('/api/properties', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ properties: local }),
+            });
+          }
         }
       } catch (err) {
         console.error('Error loading properties', err);
@@ -46,7 +62,6 @@ export default function AdminPropertiesPage() {
     };
   }, []);
 
-
   const handleToggleStatus = async (prop: Property) => {
     const actionName = prop.is_active ? 'deactivate' : 'reactivate';
     if (confirm(`Are you sure you want to ${actionName} property "${prop.name}"? Historical tokens will remain attached.`)) {
@@ -58,13 +73,18 @@ export default function AdminPropertiesPage() {
         });
         const data = await res.json();
         if (data.success) {
-          setProperties(prev => prev.map(p => (p.id === prop.id ? data.property : p)));
+          setProperties(prev => {
+            const updated = prev.map(p => (p.id === prop.id ? data.property : p));
+            setCachedProperties(updated);
+            return updated;
+          });
         }
       } catch (err) {
         console.error('Failed to toggle status', err);
       }
     }
   };
+
 
   const filteredProperties = properties.filter(p => {
     if (!search.trim()) return true;
@@ -195,12 +215,22 @@ export default function AdminPropertiesPage() {
           onClose={() => setShowModal(false)}
           propertyToEdit={selectedProperty}
           onSuccess={saved => {
+            addCachedProperty(saved);
             if (selectedProperty) {
-              setProperties(prev => prev.map(p => (p.id === saved.id ? saved : p)));
+              setProperties(prev => {
+                const updated = prev.map(p => (p.id === saved.id ? saved : p));
+                setCachedProperties(updated);
+                return updated;
+              });
             } else {
-              setProperties(prev => [...prev, saved]);
+              setProperties(prev => {
+                const updated = [...prev, saved];
+                setCachedProperties(updated);
+                return updated;
+              });
             }
           }}
+
         />
       )}
     </div>
