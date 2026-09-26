@@ -15,7 +15,7 @@ export function PublicHeader() {
 
         <div className="flex items-center space-x-3 sm:space-x-4">
           <Link
-            href="/"
+            href="/track"
             className="flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 px-3 py-2 rounded-lg transition-colors"
           >
             <Search className="w-4 h-4 text-blue-400" />

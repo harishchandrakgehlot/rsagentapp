@@ -30,10 +30,17 @@ import {
   recordReminderAttempt,
   getActivityLogs,
   getInboxMessages,
+  getTokensByMobile,
   clearStore,
 } from '../src/lib/store';
 import { generateTokenCSV, generateAgentCSV, sanitizeCSVValue } from '../src/lib/export';
 import { buildReminderMessageText, sendWhatsAppReminder } from '../src/lib/whatsapp';
+import {
+  createAgentOtpSession,
+  verifyAgentOtpSession,
+  createAgentAuthToken,
+  verifyAgentAuthToken,
+} from '../src/lib/agentAuth';
 
 let passedTests = 0;
 let totalTests = 0;
@@ -428,6 +435,38 @@ async function runTests() {
   assert(logs.length > 0, 'AC 13.1: Activity history logs actions');
   const hasCreationLog = logs.some(l => l.action === 'token_created');
   assert(hasCreationLog, 'AC 13.2: Token creation appears in activity history');
+
+  // -------------------------------------------------------------
+  // AC 17: Agent Multi-Token WhatsApp OTP Portal
+  // -------------------------------------------------------------
+  console.log('\n▶ Testing AC 17: Agent Multi-Token Tracking & WhatsApp OTP');
+  // Phone-based token resolution
+  const agentTokens = getTokensByMobile('9820123456');
+  assert(
+    agentTokens.tokens.length >= 2,
+    'AC 17.1: Resolves all active tokens linked to an agent mobile number'
+  );
+  assert(
+    agentTokens.agentName === 'Vikram Sharma',
+    'AC 17.2: Accurately identifies agent name from master directory'
+  );
+
+  // OTP Session creation and validation
+  const testPhone = '9820123456';
+  const testOtp = '654321';
+  const sessionJwt = await createAgentOtpSession(testPhone, testOtp);
+  assert(typeof sessionJwt === 'string' && sessionJwt.length > 20, 'AC 17.3: Generates signed OTP session token');
+
+  const validOtpResult = await verifyAgentOtpSession(sessionJwt, testOtp);
+  assert(validOtpResult.success === true && validOtpResult.phone === testPhone, 'AC 17.4: Validates matching WhatsApp OTP');
+
+  const invalidOtpResult = await verifyAgentOtpSession(sessionJwt, '000000');
+  assert(invalidOtpResult.success === false, 'AC 17.5: Rejects incorrect WhatsApp OTP code');
+
+  // Agent Auth Token creation & validation
+  const agentAuthJwt = await createAgentAuthToken(testPhone);
+  const verifyAuth = await verifyAgentAuthToken(agentAuthJwt);
+  assert(verifyAuth.success === true && verifyAuth.phone === testPhone, 'AC 17.6: Issues valid 7-day agent auth token');
 
   console.log('\n======================================================');
   console.log(` ALL ${passedTests}/${totalTests} ACCEPTANCE CRITERIA TESTS PASSED SUCCESSFULLY! `);

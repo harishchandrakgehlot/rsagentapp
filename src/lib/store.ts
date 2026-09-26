@@ -1707,12 +1707,48 @@ function addDays(dateStr: string, days: number): string {
 /**
  * Normalizes phone numbers to standard 10 or 12 digits for clean matching
  */
-function cleanPhoneForMatch(phone: string): string {
+export function cleanPhoneForMatch(phone: string): string {
   const digits = phone.replace(/\D/g, '');
   if (digits.length === 12 && digits.startsWith('91')) {
     return digits.slice(2);
   }
   return digits;
+}
+
+/**
+ * Retrieves all tokens linked to a specific agent's mobile phone number
+ * (matches token-level agent mobile, agent master mobile, or assigned recipients)
+ */
+export function getTokensByMobile(rawPhone: string): {
+  agentName?: string;
+  phone: string;
+  tokens: Token[];
+} {
+  const store = getStore();
+  const clean = cleanPhoneForMatch(rawPhone);
+
+  const matchedAgent = store.agents.find(a => cleanPhoneForMatch(a.mobile) === clean);
+  const matchingAgentIds = new Set(
+    store.agents.filter(a => cleanPhoneForMatch(a.mobile) === clean).map(a => a.id)
+  );
+
+  const tokens = store.tokens
+    .filter(t => !t.is_archived)
+    .filter(t => {
+      if (cleanPhoneForMatch(t.agent_mobile_number) === clean) return true;
+      if (t.agent_id && matchingAgentIds.has(t.agent_id)) return true;
+      if (Array.isArray(t.assigned_recipients)) {
+        return t.assigned_recipients.some(r => cleanPhoneForMatch(r.mobile) === clean);
+      }
+      return false;
+    })
+    .map(populateTokenRelations);
+
+  return {
+    agentName: matchedAgent?.name,
+    phone: clean,
+    tokens,
+  };
 }
 
 /**
