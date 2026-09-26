@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sendDirectWhatsAppMessage } from '@/lib/whatsapp';
-import { syncStoreFromCloud } from '@/lib/store';
+import { syncStoreFromCloud, persistStoreToCloud, recordOutboundWhatsAppMessage } from '@/lib/store';
 import { getSuperAdminSession } from '@/lib/auth';
 
 export async function POST(request: Request) {
@@ -63,6 +63,19 @@ export async function POST(request: Request) {
         { success: false, error: result.error, raw: result.rawResponse },
         { status: 400 }
       );
+    }
+
+    if (result.providerId) {
+      const deliveredContent = isTemplate
+        ? `[Official Template: ${result.deliveredTemplate || templateName || 'hello_world'}]`
+        : testBody;
+      recordOutboundWhatsAppMessage({
+        provider_message_id: result.providerId,
+        recipient_phone: recipient,
+        recipient_name: recipient,
+        message_text: deliveredContent,
+      });
+      await persistStoreToCloud();
     }
 
     const deliveredName = result.deliveredTemplate || templateName || 'hello_world';

@@ -1,6 +1,12 @@
 import { Token, ReminderType } from '@/types';
 import { formatReadableISTDate } from './ist';
-import { getWhatsAppToken, getWhatsAppPhoneNumberId, getDepartureRuleById, renderTemplateText } from './store';
+import {
+  getWhatsAppToken,
+  getWhatsAppPhoneNumberId,
+  getDepartureRuleById,
+  renderTemplateText,
+  recordOutboundWhatsAppMessage,
+} from './store';
 
 const GRAPH_API_VERSION = process.env.META_GRAPH_API_VERSION || 'v25.0';
 
@@ -219,7 +225,23 @@ export async function sendWhatsAppReminder(
 
         const data = await response.json();
         if (response.ok && data.messages?.[0]?.id) {
-          providerIds.push(data.messages[0].id);
+          const wamid = data.messages[0].id;
+          providerIds.push(wamid);
+
+          try {
+            recordOutboundWhatsAppMessage({
+              provider_message_id: wamid,
+              recipient_phone: recipientDigits,
+              recipient_name: rec.name || token.agent?.name,
+              message_text: messageText,
+              linked_token_id: token.id,
+              linked_token_number: token.token_number,
+              linked_agent_id: token.agent_id,
+              linked_agent_name: rec.name || token.agent?.name,
+            });
+          } catch (recErr) {
+            console.error('[WhatsApp] Failed to record outbound reminder to inbox:', recErr);
+          }
         } else {
           errors.push(data.error?.message || `HTTP ${response.status} sending to ${recipientDigits}`);
         }
@@ -243,9 +265,37 @@ export async function sendWhatsAppReminder(
   }
 
   // Realistic Simulation / Development fallback for all recipients
-  const mockIds = uniqueRecipients.map(
-    () => `wamid.SIM_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-  );
+  const mockIds: string[] = [];
+  for (const rec of uniqueRecipients) {
+    const recipientDigits = normalizeMobile(rec.mobile);
+    const mockId = `wamid.SIM_${Date.now()}_${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    mockIds.push(mockId);
+
+    const personalizedToken: Token = {
+      ...token,
+      agent: {
+        ...(token.agent || { id: 'ag', mobile: rec.mobile, is_active: true, created_at: '', updated_at: '' }),
+        name: rec.name,
+      },
+    };
+    const messageText = buildReminderMessageText(personalizedToken, reminderType);
+
+    try {
+      recordOutboundWhatsAppMessage({
+        provider_message_id: mockId,
+        recipient_phone: recipientDigits,
+        recipient_name: rec.name || token.agent?.name,
+        message_text: messageText,
+        linked_token_id: token.id,
+        linked_token_number: token.token_number,
+        linked_agent_id: token.agent_id,
+        linked_agent_name: rec.name || token.agent?.name,
+      });
+    } catch {
+      // ignore in simulation
+    }
+  }
+
   return {
     success: true,
     providerId: mockIds.join(', '),

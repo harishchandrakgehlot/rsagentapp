@@ -29,6 +29,7 @@ import {
   getArchivedTokens,
   recordReminderAttempt,
   getActivityLogs,
+  getInboxMessages,
   clearStore,
 } from '../src/lib/store';
 import { generateTokenCSV, generateAgentCSV, sanitizeCSVValue } from '../src/lib/export';
@@ -393,6 +394,12 @@ async function runTests() {
   assert(
     multiSendResult.success && (multiSendResult.providerId?.split(',').length ?? 0) === 3,
     'AC 11.7: WhatsApp reminder message successfully dispatched to all 3 assigned recipients'
+  );
+
+  const inboxAfterReminders = getInboxMessages();
+  assert(
+    inboxAfterReminders.messages.length >= 3,
+    'AC 11.8: Dispatched automated reminders appear in WhatsApp inbox conversation threads'
   );
 
   // -------------------------------------------------------------
