@@ -249,7 +249,7 @@ export function AgentTokenTracker({ onStepChange }: Props) {
         // Generate QR code on demand
         if (!qrCodeUrls[id]) {
           const publicUrl = `${window.location.origin}/track/${encodeURIComponent(token.token_number)}`;
-          QRCode.toDataURL(publicUrl, { width: 180, margin: 1, color: { dark: '#0b1426', light: '#ffffff' } })
+          QRCode.toDataURL(publicUrl, { width: 180, margin: 1, color: { dark: '#161E42', light: '#ffffff' } })
             .then(url => setQrCodeUrls(old => ({ ...old, [id]: url })))
             .catch(() => {});
         }
@@ -343,8 +343,8 @@ export function AgentTokenTracker({ onStepChange }: Props) {
   if (initialChecking) {
     return (
       <div className="flex flex-col items-center justify-center py-20 space-y-3">
-        <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
-        <p className="text-xs text-slate-400 tracking-wide font-medium">Verifying agent session...</p>
+        <RefreshCw className="w-8 h-8 text-[#2D3774] animate-spin" />
+        <p className="text-xs text-slate-500 tracking-wide font-medium">Verifying agent session...</p>
       </div>
     );
   }
@@ -354,26 +354,26 @@ export function AgentTokenTracker({ onStepChange }: Props) {
   // -------------------------------------------------------------
   if (step === 'mobile') {
     return (
-      <div className="bg-slate-900/90 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl max-w-lg mx-auto w-full transition-all">
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm max-w-lg mx-auto w-full transition-all">
         <div className="text-center space-y-2 mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto shadow-inner">
+          <div className="w-12 h-12 rounded-2xl bg-[#F4F6FC] border border-[#D1D7EE] text-[#2D3774] flex items-center justify-center mx-auto shadow-2xs">
             <Phone className="w-6 h-6" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
             Agent WhatsApp Login
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-sm mx-auto leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
             Enter your mobile number to receive a secure 6-digit OTP directly on WhatsApp to track all your assigned tokens.
           </p>
         </div>
 
         <form onSubmit={handleSendOtp} className="space-y-4">
           <div>
-            <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2">
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2">
               Registered WhatsApp Mobile
             </label>
             <div className="relative flex items-center">
-              <span className="absolute left-4 text-xs font-bold text-slate-400 select-none">
+              <span className="absolute left-4 text-xs font-bold text-slate-500 select-none">
                 🇮🇳 +91
               </span>
               <input
@@ -385,14 +385,14 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                 }}
                 maxLength={13}
                 placeholder="98191 43222"
-                className="w-full pl-16 pr-4 py-3.5 text-sm sm:text-base font-mono rounded-2xl bg-slate-950/80 border border-slate-700/80 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-white placeholder:text-slate-500 shadow-inner"
+                className="w-full pl-16 pr-4 py-3.5 text-sm sm:text-base font-mono rounded-xl bg-white border border-slate-300 focus:border-[#2D3774] focus:outline-none focus:ring-2 focus:ring-[#2D3774]/20 text-slate-900 placeholder:text-slate-400 shadow-2xs"
                 autoFocus
               />
             </div>
           </div>
 
           {errorMessage && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-start gap-2">
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{errorMessage}</span>
             </div>
@@ -401,7 +401,7 @@ export function AgentTokenTracker({ onStepChange }: Props) {
           <button
             type="submit"
             disabled={loading || !mobileInput.trim()}
-            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm sm:text-base shadow-lg shadow-emerald-950/50 hover:shadow-emerald-900/60 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl bg-[#2D3774] hover:bg-[#222B5C] text-white font-bold text-sm sm:text-base shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
             {loading ? (
               <>
@@ -417,9 +417,9 @@ export function AgentTokenTracker({ onStepChange }: Props) {
           </button>
         </form>
 
-        <div className="mt-6 pt-5 border-t border-slate-800 text-center">
+        <div className="mt-6 pt-5 border-t border-slate-100 text-center">
           <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
             <span>Encrypted WhatsApp verification • Only authorized numbers can view records</span>
           </p>
         </div>
@@ -432,27 +432,27 @@ export function AgentTokenTracker({ onStepChange }: Props) {
   // -------------------------------------------------------------
   if (step === 'otp') {
     return (
-      <div className="bg-slate-900/90 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl max-w-lg mx-auto w-full transition-all">
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm max-w-lg mx-auto w-full transition-all">
         <div className="text-center space-y-2 mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto shadow-inner">
+          <div className="w-12 h-12 rounded-2xl bg-[#F4F6FC] border border-[#D1D7EE] text-[#2D3774] flex items-center justify-center mx-auto shadow-2xs">
             <KeyRound className="w-6 h-6" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
             Enter WhatsApp Verification Code
           </h2>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-sm mx-auto leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-600 max-w-sm mx-auto leading-relaxed">
             We sent a 6-digit code to your WhatsApp at{' '}
-            <strong className="text-white font-mono">{maskedPhone}</strong>.
+            <strong className="text-slate-900 font-mono">{maskedPhone}</strong>.
           </p>
         </div>
 
         {devCode && (
-          <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center justify-between">
-            <span>Dev Preview Code: <strong className="font-mono text-sm tracking-wider text-white">{devCode}</strong></span>
+          <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center justify-between">
+            <span>Dev Preview Code: <strong className="font-mono text-sm tracking-wider text-slate-900">{devCode}</strong></span>
             <button
               type="button"
               onClick={() => setOtpInput(devCode)}
-              className="text-[11px] bg-amber-500/20 px-2 py-0.5 rounded text-amber-200 hover:text-white"
+              className="text-[11px] bg-amber-100 px-2 py-0.5 rounded text-amber-900 hover:bg-amber-200 font-semibold"
             >
               Fill Code
             </button>
@@ -461,7 +461,7 @@ export function AgentTokenTracker({ onStepChange }: Props) {
 
         <form onSubmit={handleVerifyOtp} className="space-y-4">
           <div>
-            <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2 text-center">
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-2 text-center">
               6-Digit OTP
             </label>
             <input
@@ -474,13 +474,13 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                 if (errorMessage) setErrorMessage(null);
               }}
               placeholder="• • • • • •"
-              className="w-full text-center py-3.5 text-2xl sm:text-3xl font-mono tracking-[0.4em] rounded-2xl bg-slate-950/80 border border-slate-700/80 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-white placeholder:text-slate-600 shadow-inner"
+              className="w-full text-center py-3.5 text-2xl sm:text-3xl font-mono tracking-[0.4em] rounded-xl bg-white border border-slate-300 focus:border-[#2D3774] focus:outline-none focus:ring-2 focus:ring-[#2D3774]/20 text-slate-900 placeholder:text-slate-300 shadow-2xs"
               autoFocus
             />
           </div>
 
           {errorMessage && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-start gap-2">
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{errorMessage}</span>
             </div>
@@ -489,7 +489,7 @@ export function AgentTokenTracker({ onStepChange }: Props) {
           <button
             type="submit"
             disabled={loading || otpInput.trim().length !== 6}
-            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm sm:text-base shadow-lg shadow-emerald-950/50 hover:shadow-emerald-900/60 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl bg-[#2D3774] hover:bg-[#222B5C] text-white font-bold text-sm sm:text-base shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
             {loading ? (
               <>
@@ -505,24 +505,24 @@ export function AgentTokenTracker({ onStepChange }: Props) {
           </button>
         </form>
 
-        <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs">
+        <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
           <button
             type="button"
             onClick={handleLogout}
-            className="text-slate-400 hover:text-white transition-colors"
+            className="text-slate-500 hover:text-slate-800 transition-colors font-medium"
           >
             ← Change Number
           </button>
 
           {resendCooldown > 0 ? (
             <span className="text-slate-400">
-              Resend in <strong className="font-mono text-slate-300">{resendCooldown}s</strong>
+              Resend in <strong className="font-mono text-slate-600">{resendCooldown}s</strong>
             </span>
           ) : (
             <button
               type="button"
               onClick={() => handleSendOtp()}
-              className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors"
+              className="text-[#2D3774] hover:text-[#161E42] font-semibold transition-colors"
             >
               Resend OTP on WhatsApp
             </button>
@@ -538,26 +538,26 @@ export function AgentTokenTracker({ onStepChange }: Props) {
   return (
     <div className="space-y-6 w-full max-w-5xl mx-auto">
       {/* Sleek Agent Executive Header */}
-      <div className="bg-slate-900/90 backdrop-blur-xl rounded-3xl border border-slate-800 shadow-2xl p-6 sm:p-7">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 pb-6 border-b border-slate-800/80">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-7">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 pb-6 border-b border-slate-200">
           <div className="flex items-center gap-4">
-            <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-500 text-white font-bold text-xl flex items-center justify-center shadow-lg shadow-emerald-900/30 shrink-0">
+            <div className="w-13 h-13 rounded-2xl bg-[#161E42] text-white font-bold text-xl flex items-center justify-center shadow-xs shrink-0">
               {agentName.slice(0, 2).toUpperCase()}
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#161E42] tracking-tight">
                   {agentName}
                 </h1>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  <ShieldCheck className="w-3.5 h-3.5" />
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                   <span>WhatsApp Verified</span>
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-1 flex items-center gap-2 font-mono">
+              <p className="text-xs text-slate-500 mt-1 flex items-center gap-2 font-mono">
                 <span>{maskedPhone}</span>
                 <span>•</span>
-                <span className="text-slate-400">IST Node Synchronized</span>
+                <span className="text-slate-500">IST Node Synchronized</span>
               </p>
             </div>
           </div>
@@ -567,7 +567,7 @@ export function AgentTokenTracker({ onStepChange }: Props) {
               type="button"
               onClick={() => fetchTokensWithAuth(authToken)}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-semibold transition-all cursor-pointer"
               title="Refresh Token List"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -577,7 +577,7 @@ export function AgentTokenTracker({ onStepChange }: Props) {
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-800/50 text-xs font-semibold transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200 hover:border-rose-200 text-xs font-semibold transition-all cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Switch Phone</span>
@@ -587,38 +587,38 @@ export function AgentTokenTracker({ onStepChange }: Props) {
 
         {/* Integrated KPI Summary Strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6">
-          <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+          <div className="bg-[#F8FAFC] p-4 rounded-xl border border-slate-200">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
               Total Tokens
             </span>
-            <span className="text-2xl font-black font-mono text-white mt-1 block">
+            <span className="text-2xl font-black font-mono text-slate-900 mt-1 block">
               {metrics.total}
             </span>
           </div>
 
-          <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 block">
+          <div className="bg-emerald-50/70 p-4 rounded-xl border border-emerald-200/80">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block">
               Active Tokens
             </span>
-            <span className="text-2xl font-black font-mono text-emerald-400 mt-1 block">
+            <span className="text-2xl font-black font-mono text-emerald-800 mt-1 block">
               {metrics.active}
             </span>
           </div>
 
-          <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 block">
+          <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200/80">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 block">
               Expiring &lt; 30 Days
             </span>
-            <span className="text-2xl font-black font-mono text-amber-400 mt-1 block">
+            <span className="text-2xl font-black font-mono text-amber-800 mt-1 block">
               {metrics.expiringSoon}
             </span>
           </div>
 
-          <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-400 block">
+          <div className="bg-rose-50/70 p-4 rounded-xl border border-rose-200/80">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700 block">
               Expired
             </span>
-            <span className="text-2xl font-black font-mono text-rose-400 mt-1 block">
+            <span className="text-2xl font-black font-mono text-rose-800 mt-1 block">
               {metrics.expired}
             </span>
           </div>
@@ -626,7 +626,7 @@ export function AgentTokenTracker({ onStepChange }: Props) {
       </div>
 
       {/* Streamlined Filter & Sort Toolbar */}
-      <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 rounded-2xl border border-slate-800 shadow-xl space-y-3.5">
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3.5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           {/* Status Filter Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
@@ -644,8 +644,8 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                 onClick={() => setFilterOption(tab.key)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                   filterOption === tab.key
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40 border border-blue-500'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                    ? 'bg-[#2D3774] text-white shadow-xs border border-[#2D3774]'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
                 }`}
               >
                 {tab.label}
@@ -655,14 +655,14 @@ export function AgentTokenTracker({ onStepChange }: Props) {
 
           {/* Sort Dropdown */}
           <div className="flex items-center gap-2 self-start md:self-auto">
-            <ArrowUpDown className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            <span className="text-xs text-slate-400 whitespace-nowrap font-medium">
+            <ArrowUpDown className="w-3.5 h-3.5 text-[#2D3774] shrink-0" />
+            <span className="text-xs text-slate-500 whitespace-nowrap font-medium">
               Sort by:
             </span>
             <select
               value={sortOption}
               onChange={e => setSortOption(e.target.value as SortOption)}
-              className="bg-slate-950 text-slate-200 border border-slate-700 text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-blue-400 cursor-pointer shadow-inner"
+              className="bg-white text-slate-700 border border-slate-300 text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-[#2D3774] cursor-pointer shadow-2xs"
             >
               <option value="expiry_asc">⏳ Expiry Date (Soonest first)</option>
               <option value="expiry_desc">⏳ Expiry Date (Furthest first)</option>
@@ -676,19 +676,19 @@ export function AgentTokenTracker({ onStepChange }: Props) {
 
         {/* Real-time search bar */}
         <div className="relative">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3 pointer-events-none" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search by Token Number, Client Name, Property or City..."
-            className="w-full pl-10 pr-9 py-2 text-xs sm:text-sm rounded-xl bg-slate-950 border border-slate-800 focus:border-blue-500 focus:outline-none text-white placeholder:text-slate-500 shadow-inner"
+            className="w-full pl-10 pr-9 py-2 text-xs sm:text-sm rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#2D3774] focus:outline-none focus:ring-2 focus:ring-[#2D3774]/20 text-slate-900 placeholder:text-slate-400 shadow-2xs transition-all"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300"
+              className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
             >
               <X className="w-4 h-4" />
             </button>
@@ -698,10 +698,10 @@ export function AgentTokenTracker({ onStepChange }: Props) {
 
       {/* Accordion Token List */}
       {filteredAndSortedTokens.length === 0 ? (
-        <div className="bg-slate-900/60 rounded-3xl border border-slate-800 p-12 text-center space-y-3">
-          <Building2 className="w-9 h-9 text-slate-600 mx-auto" />
-          <h3 className="text-base font-bold text-white">No Tokens Match Your Filter</h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3 shadow-sm">
+          <Building2 className="w-9 h-9 text-slate-400 mx-auto" />
+          <h3 className="text-base font-bold text-slate-900">No Tokens Match Your Filter</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
             {searchQuery
               ? `No tokens found matching "${searchQuery}". Try a different keyword.`
               : 'You have no tokens under this status filter.'}
@@ -713,7 +713,7 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                 setSearchQuery('');
                 setFilterOption('all');
               }}
-              className="text-xs text-blue-400 hover:text-blue-300 font-semibold underline pt-1 cursor-pointer"
+              className="text-xs text-[#2D3774] hover:text-[#161E42] font-semibold underline pt-1 cursor-pointer"
             >
               Reset Search &amp; Filters
             </button>
@@ -729,30 +729,30 @@ export function AgentTokenTracker({ onStepChange }: Props) {
             return (
               <div
                 key={token.id}
-                className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-lg overflow-hidden transition-all duration-200 hover:border-slate-700"
+                className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden transition-all duration-200 hover:border-slate-300 hover:shadow-sm"
               >
                 {/* Accordion Anchor Header */}
                 <button
                   type="button"
                   onClick={() => toggleTokenExpand(token)}
-                  className="w-full p-4 sm:p-5 flex items-center justify-between text-left cursor-pointer transition-colors hover:bg-slate-800/40"
+                  className="w-full p-4 sm:p-5 flex items-center justify-between text-left cursor-pointer transition-colors hover:bg-slate-50/70"
                   aria-expanded={isExpanded}
                 >
                   <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 pr-4">
                     {/* Token Number Badge */}
-                    <span className="font-mono font-bold text-sm sm:text-base text-cyan-300 bg-slate-950 px-3 py-1.5 rounded-xl border border-cyan-900/50 shadow-inner shrink-0">
+                    <span className="font-mono font-bold text-sm sm:text-base text-[#2D3774] bg-[#F4F6FC] px-3 py-1.5 rounded-xl border border-[#D1D7EE] shadow-2xs shrink-0">
                       {token.token_number}
                     </span>
 
                     {/* Client Name & Property Snippet */}
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="font-bold text-white text-sm sm:text-base truncate">
+                        <h4 className="font-bold text-slate-900 text-sm sm:text-base truncate">
                           {token.associate_name}
                         </h4>
                         <TokenStatusBadge status={token.computed_status} size="sm" />
                       </div>
-                      <p className="text-xs text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
+                      <p className="text-xs text-slate-500 truncate mt-0.5 flex items-center gap-1.5">
                         <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span>{token.property?.name || 'Property record'}</span>
                         {token.property?.city && (
@@ -771,15 +771,15 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                       <span
                         className={`text-xs font-mono font-bold ${
                           daysLeft < 0
-                            ? 'text-rose-400'
+                            ? 'text-rose-600'
                             : daysLeft <= 15
-                            ? 'text-amber-400'
-                            : 'text-slate-300'
+                            ? 'text-amber-600'
+                            : 'text-slate-700'
                         }`}
                       >
                         {formatReadableISTDate(token.end_date)}
                       </span>
-                      <span className="text-[10px] text-slate-400 block font-medium">
+                      <span className="text-[10px] text-slate-500 block font-medium">
                         {daysLeft < 0
                           ? `Expired ${Math.abs(daysLeft)}d ago`
                           : daysLeft === 0
@@ -788,9 +788,9 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                       </span>
                     </div>
 
-                    <div className="p-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 group-hover:border-slate-600 transition-colors">
+                    <div className="p-2 rounded-xl bg-slate-100 text-slate-600 border border-slate-200 group-hover:border-slate-300 transition-colors">
                       {isExpanded ? (
-                        <ChevronUp className="w-4 h-4 text-cyan-400" />
+                        <ChevronUp className="w-4 h-4 text-[#2D3774]" />
                       ) : (
                         <ChevronDown className="w-4 h-4" />
                       )}
@@ -800,24 +800,24 @@ export function AgentTokenTracker({ onStepChange }: Props) {
 
                 {/* Expanded Full Details */}
                 {isExpanded && (
-                  <div className="border-t border-slate-800/80 p-5 sm:p-6 bg-slate-950/70 space-y-6 text-xs sm:text-sm">
+                  <div className="border-t border-slate-200 p-5 sm:p-6 bg-[#F8FAFC] space-y-6 text-xs sm:text-sm">
                     {/* Grid of full details */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       {/* Left Column: Property & Address */}
                       <div className="space-y-4">
-                        <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-amber-500" />
                             <span>Assigned Property &amp; Address</span>
                           </span>
-                          <div className="text-white font-bold text-sm">
+                          <div className="text-slate-900 font-bold text-sm">
                             {token.property?.name || 'Property'}
                           </div>
                           {(token.property?.plot_house_no ||
                             token.property?.address_line_1 ||
                             token.property?.landmark ||
                             token.property?.city) && (
-                            <p className="text-xs text-slate-300 leading-relaxed">
+                            <p className="text-xs text-slate-600 leading-relaxed">
                               {[
                                 token.property.plot_house_no,
                                 token.property.address_line_1,
@@ -834,27 +834,27 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                         </div>
 
                         {/* Validity Dates in IST */}
-                        <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5">
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2.5">
+                          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-[#2D3774]" />
                             <span>Validity Period (IST)</span>
                           </span>
                           <div className="flex items-center gap-2.5">
-                            <div className="bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 flex-1">
-                              <span className="text-[10px] text-slate-400 block uppercase font-bold">Start Date</span>
-                              <span className="font-mono font-bold text-slate-200 text-xs">
+                            <div className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 flex-1">
+                              <span className="text-[10px] text-slate-500 block uppercase font-bold">Start Date</span>
+                              <span className="font-mono font-bold text-slate-800 text-xs">
                                 {formatReadableISTDate(token.start_date)}
                               </span>
                             </div>
-                            <span className="text-slate-600 font-bold">→</span>
-                            <div className="bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 flex-1">
-                              <span className="text-[10px] text-slate-400 block uppercase font-bold">End Date</span>
-                              <span className="font-mono font-bold text-slate-200 text-xs">
+                            <span className="text-slate-400 font-bold">→</span>
+                            <div className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 flex-1">
+                              <span className="text-[10px] text-slate-500 block uppercase font-bold">End Date</span>
+                              <span className="font-mono font-bold text-slate-800 text-xs">
                                 {formatReadableISTDate(token.end_date)}
                               </span>
                             </div>
                           </div>
-                          <p className="text-[11px] text-slate-400">
+                          <p className="text-[11px] text-slate-500">
                             {daysLeft < 0
                               ? `Token expired ${Math.abs(daysLeft)} calendar day(s) ago.`
                               : daysLeft === 0
@@ -867,15 +867,15 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                       {/* Right Column: Agent & QR Code */}
                       <div className="space-y-4">
                         {/* Authorized Representative & Recipients */}
-                        <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5 text-cyan-400" />
+                        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2">
+                          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-[#2D3774]" />
                             <span>Authorized Agent &amp; Notifications</span>
                           </span>
-                          <div className="flex items-center gap-2 text-white font-semibold">
+                          <div className="flex items-center gap-2 text-slate-900 font-semibold">
                             <span>{token.agent?.name || 'Primary Agent'}</span>
                             {token.agent_mobile_number && (
-                              <span className="text-xs font-mono text-slate-400">
+                              <span className="text-xs font-mono text-slate-500">
                                 ({token.agent_mobile_number})
                               </span>
                             )}
@@ -884,18 +884,18 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                           {/* Multiple Assigned Recipients */}
                           {Array.isArray(token.assigned_recipients) &&
                             token.assigned_recipients.length > 0 && (
-                              <div className="mt-2 pt-2 border-t border-slate-800 space-y-1">
-                                <span className="text-[10px] uppercase font-bold text-slate-400">
+                              <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                                <span className="text-[10px] uppercase font-bold text-slate-500">
                                   WhatsApp Recipients:
                                 </span>
                                 <div className="flex flex-wrap gap-1.5 pt-0.5">
                                   {token.assigned_recipients.map((rec, idx) => (
                                     <span
                                       key={idx}
-                                      className="inline-flex items-center gap-1 text-[11px] font-mono bg-slate-950 px-2 py-1 rounded-md border border-slate-800 text-slate-300"
+                                      className="inline-flex items-center gap-1 text-[11px] font-mono bg-slate-50 px-2 py-1 rounded-md border border-slate-200 text-slate-700"
                                     >
                                       <span>{rec.name}:</span>
-                                      <span className="text-emerald-400">{rec.mobile}</span>
+                                      <span className="text-emerald-700 font-bold">{rec.mobile}</span>
                                     </span>
                                   ))}
                                 </div>
@@ -904,37 +904,37 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                         </div>
 
                         {/* QR Code and Quick Tracking Link */}
-                        <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center gap-4">
+                        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center gap-4">
                           {qrUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={qrUrl}
                               alt={`QR code for ${token.token_number}`}
-                              className="w-20 h-20 bg-white p-1 rounded-xl shrink-0"
+                              className="w-20 h-20 bg-white p-1 rounded-xl shrink-0 border border-slate-200 shadow-2xs"
                             />
                           ) : (
-                            <div className="w-20 h-20 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0">
-                              <QrCode className="w-8 h-8 text-slate-600 animate-pulse" />
+                            <div className="w-20 h-20 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
+                              <QrCode className="w-8 h-8 text-slate-400 animate-pulse" />
                             </div>
                           )}
 
                           <div className="space-y-1.5 flex-1 min-w-0">
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
                               Public Certificate Link
                             </span>
-                            <p className="text-xs font-mono text-cyan-300 truncate">
+                            <p className="text-xs font-mono text-[#2D3774] font-semibold truncate">
                               /track/{token.token_number}
                             </p>
                             <div className="flex flex-wrap items-center gap-2 pt-1">
                               <button
                                 type="button"
                                 onClick={() => handleCopyLink(token.token_number, token.id)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors cursor-pointer"
                               >
                                 {copiedId === token.id ? (
                                   <>
-                                    <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                    <span className="text-emerald-400">Copied!</span>
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span className="text-emerald-600">Copied!</span>
                                   </>
                                 ) : (
                                   <>
@@ -947,7 +947,7 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                               <Link
                                 href={`/track/${encodeURIComponent(token.token_number)}`}
                                 target="_blank"
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 hover:text-white text-xs font-semibold transition-colors"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#F4F6FC] hover:bg-[#E8EDF9] text-[#2D3774] border border-[#D1D7EE] text-xs font-semibold transition-colors"
                               >
                                 <span>Certificate</span>
                                 <ExternalLink className="w-3 h-3" />
@@ -959,7 +959,7 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                                 )}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 hover:text-white text-xs font-semibold transition-colors"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold transition-colors"
                               >
                                 <Share2 className="w-3 h-3" />
                                 <span>WhatsApp</span>
@@ -972,8 +972,8 @@ export function AgentTokenTracker({ onStepChange }: Props) {
 
                     {/* Attached Documents / Photos (if any) */}
                     {Array.isArray(token.attachments) && token.attachments.length > 0 && (
-                      <div className="pt-3 border-t border-slate-800 space-y-2">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                      <div className="pt-3 border-t border-slate-200 space-y-2">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
                           Verified Attachments &amp; Documentation ({token.attachments.length})
                         </span>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -983,19 +983,19 @@ export function AgentTokenTracker({ onStepChange }: Props) {
                               href={att.storage_path}
                               target="_blank"
                               rel="noreferrer"
-                              className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 flex items-center justify-between transition-colors group"
+                              className="p-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 flex items-center justify-between transition-colors shadow-2xs group"
                             >
                               <div className="flex items-center gap-2 truncate">
                                 {att.file_type?.startsWith('image') ? (
-                                  <ImageIcon className="w-4 h-4 text-emerald-400 shrink-0" />
+                                  <ImageIcon className="w-4 h-4 text-emerald-600 shrink-0" />
                                 ) : (
-                                  <FileText className="w-4 h-4 text-blue-400 shrink-0" />
+                                  <FileText className="w-4 h-4 text-[#2D3774] shrink-0" />
                                 )}
-                                <span className="text-xs truncate font-medium group-hover:text-white">
+                                <span className="text-xs truncate font-medium text-slate-700 group-hover:text-slate-900">
                                   {att.file_name}
                                 </span>
                               </div>
-                              <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 shrink-0 ml-2" />
+                              <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 shrink-0 ml-2" />
                             </a>
                           ))}
                         </div>

@@ -7,24 +7,24 @@ import { RoyalLogo } from '@/components/brand/RoyalLogo';
 
 export function PublicHeader() {
   return (
-    <header className="bg-[#161E42] text-white border-b border-slate-800 shadow-md">
+    <header className="bg-white text-slate-800 border-b border-slate-200 shadow-2xs sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
         <Link href="/" className="flex items-center space-x-3 group">
-          <RoyalLogo variant="horizontal" theme="dark" height={40} width={140} />
+          <RoyalLogo variant="horizontal" theme="light" height={40} width={145} />
         </Link>
 
         <div className="flex items-center space-x-3 sm:space-x-4">
           <Link
             href="/track"
-            className="flex items-center gap-1.5 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 px-3 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3.5 py-2 rounded-xl transition-colors"
           >
-            <Search className="w-4 h-4 text-blue-400" />
+            <Search className="w-3.5 h-3.5 text-[#2D3774]" />
             <span>Track Token</span>
           </Link>
 
           <Link
             href="/admin"
-            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-[#2D3774] hover:bg-[#222B5C] border border-[#3E4D99] px-4 py-2 rounded-xl transition-all shadow-sm"
+            className="flex items-center gap-1.5 text-xs font-semibold text-white bg-[#2D3774] hover:bg-[#222B5C] border border-[#2D3774] px-4 py-2 rounded-xl transition-all shadow-xs"
           >
             <ShieldCheck className="w-4 h-4 text-blue-200" />
             <span>Admin Portal</span>
@@ -37,13 +37,13 @@ export function PublicHeader() {
 
 export function PublicFooter() {
   return (
-    <footer className="bg-[#0F1530] border-t border-slate-800/80 text-slate-400 text-xs py-8 mt-auto">
+    <footer className="bg-white border-t border-slate-200 text-slate-500 text-xs py-8 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
-          <span>Royal Services Real-Time Verification Node (IST)</span>
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+          <span className="text-slate-600 font-medium">Royal Services Real-Time Verification Node (IST)</span>
         </div>
-        <p className="text-center sm:text-right text-slate-400">
+        <p className="text-center sm:text-right text-slate-500">
           © {new Date().getFullYear()} Royal Services. All rights reserved. A Step Ahead.
         </p>
       </div>
