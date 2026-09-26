@@ -358,7 +358,7 @@ export function clearStore() {
 const DEFAULT_WA_CONFIG: WhatsAppIntegrationConfig = {
   token: '',
   phoneNumberId: process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1387005294491815',
-  businessAccountId: process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID || '2150898739182078',
+  businessAccountId: process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID || '2150896739162078',
   businessPhone: process.env.META_WHATSAPP_BUSINESS_PHONE || '919819143222',
 };
 
