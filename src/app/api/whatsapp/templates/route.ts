@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getWhatsAppConfig } from '@/lib/store';
+import { getWhatsAppConfig, syncStoreFromCloud } from '@/lib/store';
 import { getSuperAdminSession } from '@/lib/auth';
 
 export async function GET(request: Request) {
@@ -9,6 +9,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const { searchParams } = new URL(request.url);
     const config = getWhatsAppConfig();
     const token = searchParams.get('token') || config.token;

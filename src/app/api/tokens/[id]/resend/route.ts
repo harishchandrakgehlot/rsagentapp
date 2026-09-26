@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTokenById, recordReminderAttempt } from '@/lib/store';
+import { getTokenById, recordReminderAttempt, syncStoreFromCloud, persistStoreToCloud } from '@/lib/store';
 import { sendWhatsAppReminder } from '@/lib/whatsapp';
 import { ReminderType } from '@/types';
 import { getSuperAdminSession } from '@/lib/auth';
@@ -24,6 +24,7 @@ export async function POST(
       );
     }
 
+    await syncStoreFromCloud();
     const token = getTokenById(params.id);
     if (!token) {
       return NextResponse.json({ error: 'Token not found' }, { status: 404 });
@@ -46,6 +47,8 @@ export async function POST(
       failure_reason: sendResult.error,
       is_manual_resend: true,
     });
+
+    await persistStoreToCloud();
 
     return NextResponse.json({
       success: true,

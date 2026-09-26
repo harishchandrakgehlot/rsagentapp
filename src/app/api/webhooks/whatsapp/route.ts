@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import {
   updateReminderDeliveryStatus,
   recordIncomingWhatsAppMessage,
@@ -42,9 +42,12 @@ export async function POST(request: Request) {
     if (appSecret) {
       const signature = request.headers.get('x-hub-signature-256');
       const expectedSig = `sha256=${createHmac('sha256', appSecret).update(rawBody).digest('hex')}`;
-      if (!signature || signature !== expectedSig) {
+      if (!signature || signature.length !== expectedSig.length ||
+          !timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
         return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 403 });
       }
+    } else {
+      console.warn('[webhook] META_APP_SECRET not set — HMAC signature verification skipped. Set this env var for production security.');
     }
 
     const payload = JSON.parse(rawBody);

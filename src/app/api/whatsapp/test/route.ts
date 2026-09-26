@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sendDirectWhatsAppMessage } from '@/lib/whatsapp';
+import { syncStoreFromCloud } from '@/lib/store';
 import { getSuperAdminSession } from '@/lib/auth';
 
 export async function POST(request: Request) {
@@ -8,6 +9,8 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    await syncStoreFromCloud();
 
     const {
       recipient,

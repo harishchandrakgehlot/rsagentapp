@@ -40,11 +40,14 @@ import {
 
 // Global server-side singleton state for seamless local/preview execution
 // preserving changes across Next.js server invocations
-// Global server-side singleton state for seamless local/preview execution
-// preserving changes across Next.js server invocations
+export interface WhatsAppIntegrationConfig {
+  token: string;
+  phoneNumberId: string;
+  businessAccountId: string;
+  businessPhone: string;
+}
 declare global {
   var __rsStore: {
-
     agents: Agent[];
     properties: Property[];
     tokens: Token[];
@@ -53,6 +56,7 @@ declare global {
     activityLogs: ActivityLog[];
     departureRules: ReminderDepartureRule[];
     inboxMessages?: WhatsAppInboxMessage[];
+    whatsappConfig?: WhatsAppIntegrationConfig;
   } | undefined;
 }
 
@@ -189,7 +193,7 @@ const STORE_BLOB_PATH = 'rs_data/store_v1.json';
 const BLOB_PUBLIC_URL = 'https://qi8k31uwcevexgjk.public.blob.vercel-storage.com/rs_data/store_v1.json';
 
 let lastCloudSyncTime = 0;
-let isSyncingCloud = false;
+let syncPromise: Promise<typeof globalThis.__rsStore> | null = null;
 
 export function saveStoreToFile(storeData?: typeof globalThis.__rsStore) {
   try {
@@ -235,47 +239,57 @@ export function notifyStoreChanged() {
 
 export async function syncStoreFromCloud(force = false): Promise<typeof globalThis.__rsStore> {
   const now = Date.now();
+  // If store is already loaded and recently synced, return it immediately
   if (!force && globalThis.__rsStore && (now - lastCloudSyncTime < 2500)) {
     return globalThis.__rsStore;
   }
 
-  if (isSyncingCloud) {
-    return getStore();
+  // If another request is already syncing, WAIT for it instead of falling through
+  // This prevents concurrent cold-start requests from getting empty data
+  if (syncPromise) {
+    return syncPromise;
   }
 
-  isSyncingCloud = true;
-  try {
-    const res = await fetch(`${BLOB_PUBLIC_URL}?t=${now}`, {
-      cache: 'no-store',
-      headers: { 'Cache-Control': 'no-cache, no-store' },
-    });
+  const doSync = async (): Promise<typeof globalThis.__rsStore> => {
+    try {
+      const res = await fetch(`${BLOB_PUBLIC_URL}?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store' },
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data && typeof data === 'object') {
-        globalThis.__rsStore = {
-          agents: Array.isArray(data.agents) ? data.agents : (globalThis.__rsStore?.agents || []),
-          properties: Array.isArray(data.properties) ? data.properties : (globalThis.__rsStore?.properties || []),
-          tokens: Array.isArray(data.tokens) ? data.tokens : (globalThis.__rsStore?.tokens || []),
-          attachments: Array.isArray(data.attachments) ? data.attachments : (globalThis.__rsStore?.attachments || []),
-          reminders: Array.isArray(data.reminders) ? data.reminders : (globalThis.__rsStore?.reminders || []),
-          activityLogs: Array.isArray(data.activityLogs) ? data.activityLogs : (globalThis.__rsStore?.activityLogs || []),
-          departureRules: Array.isArray(data.departureRules) && data.departureRules.length > 0
-            ? data.departureRules
-            : (globalThis.__rsStore?.departureRules || JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES))),
-          inboxMessages: Array.isArray(data.inboxMessages) ? data.inboxMessages : (globalThis.__rsStore?.inboxMessages || []),
-        };
-        saveStoreToFile(globalThis.__rsStore);
-        lastCloudSyncTime = Date.now();
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data === 'object') {
+          globalThis.__rsStore = {
+            agents: Array.isArray(data.agents) ? data.agents : (globalThis.__rsStore?.agents || []),
+            properties: Array.isArray(data.properties) ? data.properties : (globalThis.__rsStore?.properties || []),
+            tokens: Array.isArray(data.tokens) ? data.tokens : (globalThis.__rsStore?.tokens || []),
+            attachments: Array.isArray(data.attachments) ? data.attachments : (globalThis.__rsStore?.attachments || []),
+            reminders: Array.isArray(data.reminders) ? data.reminders : (globalThis.__rsStore?.reminders || []),
+            activityLogs: Array.isArray(data.activityLogs) ? data.activityLogs : (globalThis.__rsStore?.activityLogs || []),
+            departureRules: Array.isArray(data.departureRules) && data.departureRules.length > 0
+              ? data.departureRules
+              : (globalThis.__rsStore?.departureRules || JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES))),
+            inboxMessages: Array.isArray(data.inboxMessages) ? data.inboxMessages : (globalThis.__rsStore?.inboxMessages || []),
+            whatsappConfig: data.whatsappConfig && typeof data.whatsappConfig === 'object'
+              ? data.whatsappConfig
+              : (globalThis.__rsStore?.whatsappConfig || undefined),
+          };
+          saveStoreToFile(globalThis.__rsStore);
+          lastCloudSyncTime = Date.now();
+        }
       }
+    } catch {
+      // Graceful offline fallback — use /tmp file or in-memory data
+    } finally {
+      syncPromise = null;
     }
-  } catch {
-    // Graceful offline fallback
-  } finally {
-    isSyncingCloud = false;
-  }
 
-  return getStore();
+    return getStore();
+  };
+
+  syncPromise = doSync();
+  return syncPromise;
 }
 
 function loadStoreFromFile(): typeof globalThis.__rsStore | null {
@@ -323,6 +337,7 @@ function getStore() {
 }
 
 export function clearStore() {
+  const existingConfig = globalThis.__rsStore?.whatsappConfig;
   globalThis.__rsStore = {
     agents: [],
     properties: [],
@@ -332,45 +347,48 @@ export function clearStore() {
     activityLogs: [],
     departureRules: JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES)),
     inboxMessages: [],
+    whatsappConfig: existingConfig,
   };
   notifyStoreChanged();
   return globalThis.__rsStore;
 }
 
 
-export interface WhatsAppIntegrationConfig {
-  token: string;
-  phoneNumberId: string;
-  businessAccountId: string;
-  businessPhone: string;
-}
-
-const storedWhatsAppConfig: Partial<WhatsAppIntegrationConfig> = {
-  businessPhone: process.env.META_WHATSAPP_BUSINESS_PHONE || '919819143222',
+const DEFAULT_WA_CONFIG: WhatsAppIntegrationConfig = {
+  token: '',
   phoneNumberId: process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1387005294491815',
   businessAccountId: process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID || '2150898739182078',
+  businessPhone: process.env.META_WHATSAPP_BUSINESS_PHONE || '919819143222',
 };
 
 export function setWhatsAppConfig(config: Partial<WhatsAppIntegrationConfig>) {
+  const store = getStore();
+  const current = store.whatsappConfig || { ...DEFAULT_WA_CONFIG };
+
   if (config.token !== undefined) {
     const t = config.token.trim();
-    storedWhatsAppConfig.token = (/[^\x20-\x7E]/.test(t) || t.startsWith('❌')) ? '' : t;
+    current.token = (/[^\x20-\x7E]/.test(t) || t.startsWith('❌')) ? '' : t;
   }
-  if (config.phoneNumberId !== undefined) storedWhatsAppConfig.phoneNumberId = config.phoneNumberId.trim();
-  if (config.businessAccountId !== undefined) storedWhatsAppConfig.businessAccountId = config.businessAccountId.trim();
-  if (config.businessPhone !== undefined) storedWhatsAppConfig.businessPhone = config.businessPhone.trim();
+  if (config.phoneNumberId !== undefined) current.phoneNumberId = config.phoneNumberId.trim();
+  if (config.businessAccountId !== undefined) current.businessAccountId = config.businessAccountId.trim();
+  if (config.businessPhone !== undefined) current.businessPhone = config.businessPhone.trim();
+
+  store.whatsappConfig = current;
   notifyStoreChanged();
 }
 
 export function getWhatsAppConfig(): WhatsAppIntegrationConfig {
-  const rawToken = storedWhatsAppConfig.token || process.env.META_WHATSAPP_TOKEN || '';
+  const store = getStore();
+  const saved = store.whatsappConfig;
+
+  const rawToken = saved?.token || process.env.META_WHATSAPP_TOKEN || '';
   const cleanToken = (/[^\x20-\x7E]/.test(rawToken) || rawToken.startsWith('❌')) ? '' : rawToken;
 
   return {
     token: cleanToken,
-    phoneNumberId: storedWhatsAppConfig.phoneNumberId || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1387005294491815',
-    businessAccountId: storedWhatsAppConfig.businessAccountId || process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID || '2150898739182078',
-    businessPhone: storedWhatsAppConfig.businessPhone || process.env.META_WHATSAPP_BUSINESS_PHONE || '919819143222',
+    phoneNumberId: saved?.phoneNumberId || process.env.META_WHATSAPP_PHONE_NUMBER_ID || '1387005294491815',
+    businessAccountId: saved?.businessAccountId || process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID || '2150898739182078',
+    businessPhone: saved?.businessPhone || process.env.META_WHATSAPP_BUSINESS_PHONE || '919819143222',
   };
 }
 

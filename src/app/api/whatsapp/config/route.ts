@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getWhatsAppConfig, setWhatsAppConfig } from '@/lib/store';
+import { getWhatsAppConfig, setWhatsAppConfig, syncStoreFromCloud, persistStoreToCloud } from '@/lib/store';
 import { getSuperAdminSession } from '@/lib/auth';
 
 export async function GET() {
@@ -9,6 +9,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const config = getWhatsAppConfig();
     return NextResponse.json({
       hasToken: Boolean(config.token),
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    await syncStoreFromCloud();
     const body = await request.json();
     const { token, phoneNumberId, businessAccountId, businessPhone } = body;
 
@@ -53,6 +55,8 @@ export async function POST(request: Request) {
       businessPhone: businessPhone !== undefined ? businessPhone : undefined,
     });
 
+    await persistStoreToCloud();
+
     return NextResponse.json({
       success: true,
       config: getWhatsAppConfig(),
@@ -63,3 +67,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
