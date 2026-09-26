@@ -14,6 +14,7 @@ import {
   ReminderDepartureRule,
   TemplatePlaceholder,
   TokenRecipient,
+  WhatsAppInboxMessage,
 } from '@/types';
 import fs from 'fs';
 import path from 'path';
@@ -51,6 +52,7 @@ declare global {
     reminders: Reminder[];
     activityLogs: ActivityLog[];
     departureRules: ReminderDepartureRule[];
+    inboxMessages?: WhatsAppInboxMessage[];
   } | undefined;
 }
 
@@ -261,6 +263,7 @@ export async function syncStoreFromCloud(force = false): Promise<typeof globalTh
           departureRules: Array.isArray(data.departureRules) && data.departureRules.length > 0
             ? data.departureRules
             : (globalThis.__rsStore?.departureRules || JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES))),
+          inboxMessages: Array.isArray(data.inboxMessages) ? data.inboxMessages : (globalThis.__rsStore?.inboxMessages || []),
         };
         saveStoreToFile(globalThis.__rsStore);
         lastCloudSyncTime = Date.now();
@@ -295,6 +298,7 @@ function getStore() {
     const fromFile = loadStoreFromFile();
     if (fromFile) {
       globalThis.__rsStore = fromFile;
+      if (!globalThis.__rsStore.inboxMessages) globalThis.__rsStore.inboxMessages = [];
     } else {
       globalThis.__rsStore = {
         agents: JSON.parse(JSON.stringify(INITIAL_AGENTS)),
@@ -304,12 +308,16 @@ function getStore() {
         reminders: JSON.parse(JSON.stringify(INITIAL_REMINDERS)),
         activityLogs: JSON.parse(JSON.stringify(INITIAL_ACTIVITY_LOGS)),
         departureRules: JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES)),
+        inboxMessages: [],
       };
       saveStoreToFile(globalThis.__rsStore);
     }
   } else if (!globalThis.__rsStore.departureRules) {
     globalThis.__rsStore.departureRules = JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES));
+    if (!globalThis.__rsStore.inboxMessages) globalThis.__rsStore.inboxMessages = [];
     saveStoreToFile(globalThis.__rsStore);
+  } else if (!globalThis.__rsStore.inboxMessages) {
+    globalThis.__rsStore.inboxMessages = [];
   }
   return globalThis.__rsStore;
 }
@@ -323,6 +331,7 @@ export function clearStore() {
     reminders: [],
     activityLogs: [],
     departureRules: JSON.parse(JSON.stringify(DEFAULT_DEPARTURE_RULES)),
+    inboxMessages: [],
   };
   notifyStoreChanged();
   return globalThis.__rsStore;
@@ -1675,3 +1684,153 @@ function addDays(dateStr: string, days: number): string {
   const nd = String(date.getDate()).padStart(2, '0');
   return `${ny}-${nm}-${nd}`;
 }
+
+/**
+ * Normalizes phone numbers to standard 10 or 12 digits for clean matching
+ */
+function cleanPhoneForMatch(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return digits.slice(2);
+  }
+  return digits;
+}
+
+/**
+ * Records an incoming WhatsApp message received via Meta Webhook
+ */
+export function recordIncomingWhatsAppMessage(input: {
+  provider_message_id: string;
+  sender_phone: string;
+  sender_name?: string;
+  message_text: string;
+  message_type?: string;
+  media_url?: string;
+  timestamp?: string;
+}): WhatsAppInboxMessage {
+  const store = getStore();
+  if (!store.inboxMessages) store.inboxMessages = [];
+
+  // De-duplicate if provider_message_id already exists
+  const existing = store.inboxMessages.find(m => m.provider_message_id === input.provider_message_id);
+  if (existing) {
+    return existing;
+  }
+
+  const cleanSender = cleanPhoneForMatch(input.sender_phone);
+
+  // Match with Agent Directory
+  const matchedAgent = store.agents.find(a => cleanPhoneForMatch(a.mobile) === cleanSender);
+
+  // Match with Tokens (either agent_mobile_number or any assigned_recipients)
+  const matchedToken = store.tokens.find(t => {
+    if (cleanPhoneForMatch(t.agent_mobile_number) === cleanSender) return true;
+    if (Array.isArray(t.assigned_recipients)) {
+      return t.assigned_recipients.some(r => cleanPhoneForMatch(r.mobile) === cleanSender);
+    }
+    return false;
+  });
+
+  const resolvedSenderName =
+    input.sender_name?.trim() ||
+    matchedAgent?.name ||
+    matchedToken?.associate_name ||
+    `+${input.sender_phone}`;
+
+  const inboxMsg: WhatsAppInboxMessage = {
+    id: `inbox-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 6)}`,
+    provider_message_id: input.provider_message_id,
+    sender_phone: input.sender_phone,
+    sender_name: resolvedSenderName,
+    message_text: input.message_text,
+    message_type: (input.message_type as WhatsAppInboxMessage['message_type']) || 'text',
+    media_url: input.media_url,
+    timestamp: input.timestamp || new Date().toISOString(),
+    is_read: false,
+    linked_token_id: matchedToken?.id,
+    linked_token_number: matchedToken?.token_number,
+    linked_agent_id: matchedAgent?.id,
+    linked_agent_name: matchedAgent?.name,
+  };
+
+  store.inboxMessages.unshift(inboxMsg);
+
+  recordActivityLog({
+    action: 'whatsapp_reply_received',
+    target_type: 'reminder',
+    target_id: matchedToken ? matchedToken.token_number : input.sender_phone,
+    summary: `Received WhatsApp reply from ${resolvedSenderName} (${input.sender_phone}): "${input.message_text.slice(0, 60)}"`,
+    details: {
+      provider_message_id: input.provider_message_id,
+      token_number: matchedToken?.token_number,
+      agent_name: matchedAgent?.name,
+    },
+  });
+
+  notifyStoreChanged();
+  return inboxMsg;
+}
+
+export function getInboxMessages(options?: {
+  search?: string;
+  unreadOnly?: boolean;
+  limit?: number;
+}): { messages: WhatsAppInboxMessage[]; total: number; unreadCount: number } {
+  const store = getStore();
+  const all = store.inboxMessages || [];
+  const unreadCount = all.filter(m => !m.is_read).length;
+
+  let filtered = [...all];
+
+  if (options?.unreadOnly) {
+    filtered = filtered.filter(m => !m.is_read);
+  }
+
+  if (options?.search && options.search.trim()) {
+    const q = options.search.toLowerCase().trim();
+    filtered = filtered.filter(m =>
+      m.message_text.toLowerCase().includes(q) ||
+      m.sender_phone.includes(q) ||
+      (m.sender_name && m.sender_name.toLowerCase().includes(q)) ||
+      (m.linked_token_number && m.linked_token_number.toLowerCase().includes(q))
+    );
+  }
+
+  const total = filtered.length;
+  if (options?.limit && options.limit > 0) {
+    filtered = filtered.slice(0, options.limit);
+  }
+
+  return {
+    messages: filtered,
+    total,
+    unreadCount,
+  };
+}
+
+export function markInboxMessageRead(id: string, isRead = true): WhatsAppInboxMessage | null {
+  const store = getStore();
+  const msg = (store.inboxMessages || []).find(m => m.id === id);
+  if (!msg) return null;
+
+  msg.is_read = isRead;
+  notifyStoreChanged();
+  return msg;
+}
+
+export function markAllInboxMessagesRead(): number {
+  const store = getStore();
+  const all = store.inboxMessages || [];
+  let updated = 0;
+  for (const m of all) {
+    if (!m.is_read) {
+      m.is_read = true;
+      updated++;
+    }
+  }
+  if (updated > 0) {
+    notifyStoreChanged();
+  }
+  return updated;
+}
+

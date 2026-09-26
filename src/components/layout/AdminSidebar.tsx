@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   MessageSquareQuote,
   FileCode2,
+  MessageSquareText,
 } from 'lucide-react';
 import { RoyalLogo } from '@/components/brand/RoyalLogo';
 
@@ -27,30 +28,51 @@ export function AdminSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [userEmail, setUserEmail] = useState('harishchandrakgehlot@gmail.com');
+  const [unreadInboxCount, setUnreadInboxCount] = useState<number>(0);
 
   React.useEffect(() => {
     let ignore = false;
-    (async () => {
+    const fetchSessionAndInbox = async () => {
       try {
-        const res = await fetch('/api/auth/session');
-        if (res.ok) {
-          const data = await res.json();
+        const [sessRes, inboxRes] = await Promise.all([
+          fetch('/api/auth/session'),
+          fetch('/api/inbox?limit=1'),
+        ]);
+
+        if (sessRes.ok) {
+          const data = await sessRes.json();
           if (!ignore && data.email) {
             setUserEmail(data.email);
           }
         }
+
+        if (inboxRes.ok) {
+          const inboxData = await inboxRes.json();
+          if (!ignore && typeof inboxData.unreadCount === 'number') {
+            setUnreadInboxCount(inboxData.unreadCount);
+          }
+        }
       } catch {}
-    })();
+    };
+
+    fetchSessionAndInbox();
+    const interval = setInterval(fetchSessionAndInbox, 30000);
     return () => {
       ignore = true;
+      clearInterval(interval);
     };
-  }, []);
-
+  }, [pathname]);
 
   const navItems = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Tokens', href: '/admin/tokens', icon: Ticket },
     { name: 'Archived Tokens', href: '/admin/archive', icon: Archive },
+    {
+      name: 'WhatsApp Inbox',
+      href: '/admin/inbox',
+      icon: MessageSquareText,
+      badge: unreadInboxCount > 0 ? unreadInboxCount : undefined,
+    },
     { name: 'Agents', href: '/admin/agents', icon: Users },
     { name: 'Properties', href: '/admin/properties', icon: Building2 },
     { name: 'Activity & WhatsApp', href: '/admin/activity', icon: History },
@@ -111,7 +133,12 @@ export function AdminSidebar() {
               }`}
             >
               <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-              <span>{item.name}</span>
+              <span className="flex-1 text-left">{item.name}</span>
+              {item.badge !== undefined && (
+                <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-500 text-white shadow-xs">
+                  {item.badge}
+                </span>
+              )}
             </Link>
           );
         })}

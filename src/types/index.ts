@@ -177,3 +177,20 @@ export interface TemplatePlaceholder {
   description: string;
   example: string;
 }
+
+export interface WhatsAppInboxMessage {
+  id: string;
+  provider_message_id: string; // Meta message ID: wamid.xxx
+  sender_phone: string; // e.g. 919876543210
+  sender_name?: string; // from contacts[0].profile.name or resolved from agent / token
+  message_text: string;
+  message_type: 'text' | 'image' | 'document' | 'interactive' | 'button' | 'other';
+  media_url?: string;
+  timestamp: string; // ISO 8601
+  is_read: boolean;
+  linked_token_id?: string;
+  linked_token_number?: string;
+  linked_agent_id?: string;
+  linked_agent_name?: string;
+}
+

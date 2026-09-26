@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
-import { updateReminderDeliveryStatus } from '@/lib/store';
+import {
+  updateReminderDeliveryStatus,
+  recordIncomingWhatsAppMessage,
+  syncStoreFromCloud,
+  persistStoreToCloud,
+} from '@/lib/store';
 import { DeliveryStatus } from '@/types';
 
 /**
@@ -25,7 +30,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * Meta Webhook message status updates
+ * Meta Webhook message status updates and incoming client replies
  * Verifies X-Hub-Signature-256 before processing any payload.
  */
 export async function POST(request: Request) {
@@ -44,11 +49,16 @@ export async function POST(request: Request) {
 
     const payload = JSON.parse(rawBody);
 
-    // Check if payload contains WhatsApp status updates
+    await syncStoreFromCloud();
+
+    let hasMutations = false;
+
+    // Check if payload contains WhatsApp status updates or incoming messages
     const entries = payload.entry || [];
     for (const entry of entries) {
       const changes = entry.changes || [];
       for (const change of changes) {
+        // 1. Delivery Receipts & Statuses
         const statuses = change.value?.statuses || [];
         for (const st of statuses) {
           const messageId = st.id;
@@ -57,9 +67,60 @@ export async function POST(request: Request) {
 
           if (messageId && status) {
             updateReminderDeliveryStatus(messageId, status, failureReason);
+            hasMutations = true;
           }
         }
+
+        // 2. Incoming Messages / Replies from Clients and Agents
+        const messages = change.value?.messages || [];
+        const contacts = change.value?.contacts || [];
+        for (const msg of messages) {
+          const fromPhone = msg.from;
+          if (!fromPhone) continue;
+
+          interface ContactProfile {
+            wa_id?: string;
+            profile?: { name?: string };
+          }
+          const contact = (contacts as ContactProfile[]).find(c => c.wa_id === fromPhone);
+          const senderName = contact?.profile?.name;
+          const msgType = msg.type || 'text';
+
+          let textBody = '';
+          if (msgType === 'text') {
+            textBody = msg.text?.body || '';
+          } else if (msgType === 'image') {
+            textBody = msg.image?.caption || '[Photo / Image attachment]';
+          } else if (msgType === 'document') {
+            textBody = msg.document?.caption || `[Document: ${msg.document?.filename || 'File'}]`;
+          } else if (msgType === 'button') {
+            textBody = msg.button?.text || '[Quick reply button clicked]';
+          } else if (msgType === 'interactive') {
+            textBody =
+              msg.interactive?.button_reply?.title ||
+              msg.interactive?.list_reply?.title ||
+              '[Interactive reply]';
+          } else {
+            textBody = `[${msgType} message]`;
+          }
+
+          recordIncomingWhatsAppMessage({
+            provider_message_id: msg.id || `wamid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            sender_phone: fromPhone,
+            sender_name: senderName,
+            message_text: textBody,
+            message_type: msgType,
+            timestamp: msg.timestamp
+              ? new Date(Number(msg.timestamp) * 1000).toISOString()
+              : new Date().toISOString(),
+          });
+          hasMutations = true;
+        }
       }
+    }
+
+    if (hasMutations) {
+      await persistStoreToCloud();
     }
 
     return NextResponse.json({ success: true });
