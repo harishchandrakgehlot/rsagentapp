@@ -1,48 +1,79 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { AdminHeader } from '@/components/layout/AdminHeader';
-import { WhatsAppInboxMessage } from '@/types';
-import { formatReadableISTDateTime } from '@/lib/ist';
+import { WhatsAppInboxMessage, WhatsAppChatThread } from '@/types';
 import {
   MessageSquareText,
   Search,
   CheckCheck,
   RefreshCw,
   ExternalLink,
-  MessageCircle,
   Ticket,
-  User,
-  Phone,
-  MailCheck,
-  Clock,
-  CheckCircle2,
+  Send,
+  ArrowLeft,
+  Smile,
+  Paperclip,
+  Moon,
+  Sun,
+  X,
+  Lock,
+  AlertCircle,
 } from 'lucide-react';
 
-export default function AdminWhatsAppInboxPage() {
-  const [messages, setMessages] = useState<WhatsAppInboxMessage[]>([]);
-  const [unreadCount, setUnreadCount] = useState<number>(0);
+function createTempMessage(text: string, thread: WhatsAppChatThread): WhatsAppInboxMessage {
+  const tempId = `temp-${Date.now()}`;
+  return {
+    id: tempId,
+    provider_message_id: tempId,
+    sender_phone: thread.phone,
+    sender_name: 'Royal Services Admin',
+    message_text: text,
+    message_type: 'text',
+    timestamp: new Date().toISOString(),
+    is_read: true,
+    direction: 'outbound',
+    linked_token_id: thread.linkedTokenId,
+    linked_token_number: thread.linkedTokenNumber,
+    linked_agent_id: thread.linkedAgentId,
+    linked_agent_name: thread.linkedAgentName,
+  };
+}
+
+export default function AdminWhatsAppWebPage() {
+  const [threads, setThreads] = useState<WhatsAppChatThread[]>([]);
+  const [selectedPhone, setSelectedPhone] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [filterMode, setFilterMode] = useState<'all' | 'unread' | 'tokens' | 'agents'>('all');
+  const [darkMode, setDarkMode] = useState(true);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState('');
-  const [filterMode, setFilterMode] = useState<'all' | 'unread' | 'linked'>('all');
-  const [actionSuccess, setActionSuccess] = useState('');
+  const [inputText, setInputText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const fetchInbox = async (showRefreshing = false) => {
-    if (showRefreshing) setRefreshing(true);
+  // Fetch threads and messages from backend
+  const fetchInboxData = async (isManual = false) => {
+    if (isManual) setRefreshing(true);
     try {
       const res = await fetch('/api/inbox');
       if (res.ok) {
         const data = await res.json();
-        setMessages(data.messages || []);
-        setUnreadCount(data.unreadCount || 0);
+        const incomingThreads: WhatsAppChatThread[] = data.threads || [];
+        setThreads(incomingThreads);
+
+        // Auto-select first thread if none selected on desktop
+        if (!selectedPhone && incomingThreads.length > 0 && typeof window !== 'undefined' && window.innerWidth >= 768) {
+          setSelectedPhone(incomingThreads[0].phone);
+        }
       }
     } catch (err) {
       console.error('Error fetching inbox:', err);
     } finally {
       setLoading(false);
-      if (showRefreshing) setRefreshing(false);
+      if (isManual) setRefreshing(false);
     }
   };
 
@@ -54,361 +85,666 @@ export default function AdminWhatsAppInboxPage() {
         if (res.ok) {
           const data = await res.json();
           if (!ignore) {
-            setMessages(data.messages || []);
-            setUnreadCount(data.unreadCount || 0);
+            const incomingThreads: WhatsAppChatThread[] = data.threads || [];
+            setThreads(incomingThreads);
+            if (incomingThreads.length > 0 && typeof window !== 'undefined' && window.innerWidth >= 768) {
+              setSelectedPhone(incomingThreads[0].phone);
+            }
           }
         }
       } catch (err) {
-        console.error('Error fetching inbox:', err);
+        console.error('Error initializing inbox:', err);
       } finally {
         if (!ignore) setLoading(false);
       }
     })();
 
-    // Background polling every 20s for new client replies
-    const timer = setInterval(() => {
-      if (!ignore) fetchInbox(false);
-    }, 20000);
+    // Background polling every 8s for live message updates
+    const pollTimer = setInterval(() => {
+      if (!ignore) fetchInboxData(false);
+    }, 8000);
 
     return () => {
       ignore = true;
-      clearInterval(timer);
+      clearInterval(pollTimer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleToggleRead = async (msg: WhatsAppInboxMessage) => {
-    const newStatus = !msg.is_read;
-    // Optimistic UI update
-    setMessages(prev =>
-      prev.map(m => (m.id === msg.id ? { ...m, is_read: newStatus } : m))
+  // Scroll to bottom when messages in active thread change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [selectedPhone, threads]);
+
+  // Find currently active thread
+  const activeThread = threads.find(t => t.phone === selectedPhone) || null;
+
+  // Mark thread as read when selected
+  const handleSelectThread = async (phone: string) => {
+    setSelectedPhone(phone);
+    setSendError(null);
+    setTimeout(() => inputRef.current?.focus(), 100);
+
+    // Optimistically clear unread count for this thread
+    setThreads(prev =>
+      prev.map(t => (t.phone === phone ? { ...t, unreadCount: 0 } : t))
     );
-    setUnreadCount(prev => (newStatus ? Math.max(0, prev - 1) : prev + 1));
 
     try {
       await fetch('/api/inbox', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: msg.id, is_read: newStatus }),
+        body: JSON.stringify({ action: 'mark_thread_read', phone }),
       });
-    } catch {
-      // Revert on error
-      fetchInbox();
-    }
+    } catch {}
   };
 
-  const handleMarkAllRead = async () => {
-    setMessages(prev => prev.map(m => ({ ...m, is_read: true })));
-    setUnreadCount(0);
-    setActionSuccess('All incoming messages marked as read.');
-    setTimeout(() => setActionSuccess(''), 4000);
+  // Send reply from website via Meta WhatsApp Cloud API
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!inputText.trim() || !activeThread || sending) return;
+
+    const textToSend = inputText.trim();
+    setInputText('');
+    setSending(true);
+    setSendError(null);
+
+    // Optimistic message append
+    const optimisticMsg = createTempMessage(textToSend, activeThread);
+    const tempId = optimisticMsg.id;
+
+    setThreads(prev =>
+      prev.map(t => {
+        if (t.phone === activeThread.phone) {
+          return {
+            ...t,
+            lastMessage: optimisticMsg,
+            messages: [...t.messages, optimisticMsg],
+          };
+        }
+        return t;
+      })
+    );
 
     try {
-      await fetch('/api/inbox', {
-        method: 'PUT',
+      const res = await fetch('/api/inbox', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'mark_all_read' }),
+        body: JSON.stringify({
+          recipientPhone: activeThread.phone,
+          recipientName: activeThread.contactName,
+          messageText: textToSend,
+          linkedTokenId: activeThread.linkedTokenId,
+          linkedAgentId: activeThread.linkedAgentId,
+        }),
       });
-    } catch {
-      fetchInbox();
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setSendError(data.error || 'Failed to dispatch via Meta API');
+      } else if (data.message) {
+        // Replace optimistic message with actual provider message
+        setThreads(prev =>
+          prev.map(t => {
+            if (t.phone === activeThread.phone) {
+              return {
+                ...t,
+                messages: t.messages.map(m => (m.id === tempId ? data.message : m)),
+                lastMessage: data.message,
+              };
+            }
+            return t;
+          })
+        );
+      }
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setSending(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
   };
 
-  // Filter messages
-  const filteredMessages = messages.filter(msg => {
-    // Mode filter
-    if (filterMode === 'unread' && msg.is_read) return false;
-    if (filterMode === 'linked' && !msg.linked_token_number) return false;
+  // Filter threads
+  const filteredThreads = threads.filter(t => {
+    if (filterMode === 'unread' && t.unreadCount === 0) return false;
+    if (filterMode === 'tokens' && !t.linkedTokenNumber) return false;
+    if (filterMode === 'agents' && !t.linkedAgentName) return false;
 
-    // Search query
     if (search.trim()) {
       const q = search.toLowerCase().trim();
-      const matchText = msg.message_text.toLowerCase().includes(q);
-      const matchPhone = msg.sender_phone.includes(q);
-      const matchName = msg.sender_name && msg.sender_name.toLowerCase().includes(q);
-      const matchToken = msg.linked_token_number && msg.linked_token_number.toLowerCase().includes(q);
-      if (!matchText && !matchPhone && !matchName && !matchToken) return false;
+      return (
+        t.contactName.toLowerCase().includes(q) ||
+        t.phone.includes(q) ||
+        (t.linkedTokenNumber && t.linkedTokenNumber.toLowerCase().includes(q)) ||
+        (t.linkedAgentName && t.linkedAgentName.toLowerCase().includes(q)) ||
+        t.lastMessage.message_text.toLowerCase().includes(q)
+      );
     }
-
     return true;
   });
 
-  const totalReceived = messages.length;
-  const linkedCount = messages.filter(m => m.linked_token_number).length;
-  const uniqueSenders = new Set(messages.map(m => m.sender_phone)).size;
+  // Time formatter
+  const formatMsgTime = (isoString: string) => {
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch {
+      return '';
+    }
+  };
+
+  const formatThreadDate = (isoString: string) => {
+    try {
+      const d = new Date(isoString);
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      if (isToday) {
+        return d.toLocaleTimeString('en-IN', {
+          timeZone: 'Asia/Kolkata',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        });
+      }
+      return d.toLocaleDateString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+    } catch {
+      return '';
+    }
+  };
+
+  // Color generator for contact avatars
+  const getAvatarBg = (name: string) => {
+    const colors = [
+      'bg-emerald-600',
+      'bg-blue-600',
+      'bg-purple-600',
+      'bg-amber-600',
+      'bg-rose-600',
+      'bg-teal-600',
+      'bg-indigo-600',
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i);
+    return colors[Math.abs(hash) % colors.length];
+  };
 
   return (
-    <div className="space-y-6">
-      <AdminHeader
-        title="WhatsApp Inbox & Client Replies"
-        subtitle="Incoming customer and agent responses sent to +91 98191 43222, linked to service tokens with 1-click WhatsApp quick reply"
-        action={{
-          label: refreshing ? 'Checking...' : 'Refresh Inbox',
-          icon: <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />,
-          onClick: () => fetchInbox(true),
-        }}
-      />
-
-      {/* Success Notification Alert */}
-      {actionSuccess && (
-        <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-medium">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>{actionSuccess}</span>
-        </div>
-      )}
-
-      {/* KPI Stats Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+    <div
+      className={`rounded-2xl overflow-hidden border shadow-xl transition-colors duration-200 ${
+        darkMode
+          ? 'bg-[#111b21] border-[#222d34] text-[#e9edef]'
+          : 'bg-white border-slate-200 text-slate-800'
+      } h-[calc(100vh-6.5rem)] flex flex-col`}
+    >
+      {/* WhatsApp Top Navigation Bar */}
+      <div
+        className={`px-4 py-2.5 flex items-center justify-between border-b ${
+          darkMode ? 'bg-[#202c33] border-[#222d34]' : 'bg-[#f0f2f5] border-slate-200'
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-[#00a884] flex items-center justify-center text-white shadow-xs">
             <MessageSquareText className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">Total Replies</p>
-            <p className="text-2xl font-bold text-slate-900">{totalReceived}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-            <MailCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 font-medium">Unread Replies</p>
-            <p className="text-2xl font-bold text-emerald-600">{unreadCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-            <Ticket className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 font-medium">Linked to Tokens</p>
-            <p className="text-2xl font-bold text-slate-900">{linkedCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
-            <User className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 font-medium">Unique Senders</p>
-            <p className="text-2xl font-bold text-slate-900">{uniqueSenders}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Controls & Filter Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-          {/* Search Box */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search by sender name, mobile (+91), token number, or message content..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#2D3774] focus:border-transparent"
-            />
-          </div>
-
-          {/* Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-            <button
-              onClick={() => setFilterMode('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0 ${
-                filterMode === 'all'
-                  ? 'bg-[#161E42] text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              All ({totalReceived})
-            </button>
-            <button
-              onClick={() => setFilterMode('unread')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0 flex items-center gap-1.5 ${
-                filterMode === 'unread'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-              }`}
-            >
-              Unread
-              {unreadCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white text-emerald-800 font-bold">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setFilterMode('linked')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0 ${
-                filterMode === 'linked'
-                  ? 'bg-[#161E42] text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Linked to Token ({linkedCount})
-            </button>
-          </div>
-
-          {/* Mark All Read Action */}
-          {unreadCount > 0 && (
-            <button
-              onClick={handleMarkAllRead}
-              className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors shrink-0"
-              title="Mark all as read"
-            >
-              <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
-              Mark all read
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Messages Feed */}
-      <div className="space-y-3">
-        {loading ? (
-          <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center">
-            <RefreshCw className="w-8 h-8 text-[#2D3774] animate-spin mx-auto mb-3" />
-            <p className="text-sm font-medium text-slate-600">Loading WhatsApp Inbox...</p>
-          </div>
-        ) : filteredMessages.length === 0 ? (
-          <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-              <MessageSquareText className="w-7 h-7" />
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-sm tracking-tight">Royal Services WhatsApp Web</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#00a884]/20 text-[#00a884]">
+                LIVE META API
+              </span>
             </div>
-            <h3 className="text-base font-semibold text-slate-800">
-              {search || filterMode !== 'all' ? 'No matching replies found' : 'No WhatsApp replies yet'}
-            </h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-              When clients or agents reply to automated WhatsApp token notifications sent by your business number (+91 98191 43222), their messages will instantly appear here with full token history and quick-reply options.
+            <p className="text-[11px] opacity-70">
+              Business Number: <span className="font-mono font-medium">+91 98191 43222</span>
             </p>
-            {(search || filterMode !== 'all') && (
-              <button
-                onClick={() => {
-                  setSearch('');
-                  setFilterMode('all');
-                }}
-                className="text-xs font-semibold text-[#2D3774] hover:underline pt-2"
-              >
-                Clear search & filters
-              </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fetchInboxData(true)}
+            className={`p-2 rounded-full transition-colors ${
+              darkMode ? 'hover:bg-[#374248] text-[#aebac1]' : 'hover:bg-slate-200 text-slate-600'
+            }`}
+            title="Refresh messages"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className={`p-2 rounded-full transition-colors ${
+              darkMode ? 'hover:bg-[#374248] text-[#aebac1]' : 'hover:bg-slate-200 text-slate-600'
+            }`}
+            title={darkMode ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
+          >
+            {darkMode ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-slate-700" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Main 2-Pane Container */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* ============================================================ */}
+        {/* LEFT COLUMN: CHAT THREADS LIST (Desktop: 380px, Mobile: full if no chat) */}
+        {/* ============================================================ */}
+        <div
+          className={`${
+            selectedPhone ? 'hidden md:flex' : 'flex'
+          } w-full md:w-[380px] lg:w-[420px] flex-col border-r ${
+            darkMode ? 'bg-[#111b21] border-[#222d34]' : 'bg-white border-slate-200'
+          }`}
+        >
+          {/* Search Bar */}
+          <div className="p-2.5 space-y-2">
+            <div
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs ${
+                darkMode
+                  ? 'bg-[#202c33] border-transparent text-[#e9edef] focus-within:border-[#00a884]'
+                  : 'bg-[#f0f2f5] border-transparent text-slate-800 focus-within:border-[#00a884]'
+              }`}
+            >
+              <Search className="w-4 h-4 opacity-50 shrink-0" />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search or start a new chat"
+                className="bg-transparent outline-none w-full placeholder:opacity-50 text-xs"
+              />
+              {search && (
+                <button onClick={() => setSearch('')} className="opacity-50 hover:opacity-100">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] pb-1 scrollbar-none">
+              {(['all', 'unread', 'tokens', 'agents'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setFilterMode(mode)}
+                  className={`px-3 py-1 rounded-full font-medium capitalize shrink-0 transition-all ${
+                    filterMode === mode
+                      ? 'bg-[#00a884] text-white font-semibold'
+                      : darkMode
+                      ? 'bg-[#202c33] text-[#8696a0] hover:bg-[#2a3942]'
+                      : 'bg-[#f0f2f5] text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Threads List */}
+          <div className="flex-1 overflow-y-auto divide-y divide-transparent">
+            {loading ? (
+              <div className="p-8 text-center opacity-60 flex flex-col items-center gap-2">
+                <RefreshCw className="w-6 h-6 animate-spin text-[#00a884]" />
+                <p className="text-xs">Loading conversations...</p>
+              </div>
+            ) : filteredThreads.length === 0 ? (
+              <div className="p-8 text-center opacity-60 space-y-2">
+                <MessageSquareText className="w-8 h-8 mx-auto text-[#00a884]" />
+                <p className="text-xs font-semibold">No chats found</p>
+                <p className="text-[11px] opacity-75">
+                  Incoming replies sent to +91 98191 43222 will appear here automatically.
+                </p>
+              </div>
+            ) : (
+              filteredThreads.map(thread => {
+                const isSelected = thread.phone === selectedPhone;
+                const lastMsg = thread.lastMessage;
+                const isOutbound = lastMsg?.direction === 'outbound';
+
+                return (
+                  <button
+                    key={thread.phone}
+                    onClick={() => handleSelectThread(thread.phone)}
+                    className={`w-full text-left p-3 flex items-start gap-3 transition-colors ${
+                      isSelected
+                        ? darkMode
+                          ? 'bg-[#2a3942]'
+                          : 'bg-[#f0f2f5]'
+                        : darkMode
+                        ? 'hover:bg-[#202c33]'
+                        : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    {/* Contact Avatar */}
+                    <div
+                      className={`w-11 h-11 rounded-full shrink-0 flex items-center justify-center text-white font-bold text-sm shadow-xs ${getAvatarBg(
+                        thread.contactName
+                      )}`}
+                    >
+                      {thread.contactName.slice(0, 2).toUpperCase()}
+                    </div>
+
+                    {/* Chat Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-semibold text-xs truncate">
+                          {thread.contactName}
+                        </span>
+                        <span
+                          className={`text-[10px] shrink-0 ${
+                            thread.unreadCount > 0 ? 'text-[#00a884] font-bold' : 'opacity-50'
+                          }`}
+                        >
+                          {formatThreadDate(lastMsg.timestamp)}
+                        </span>
+                      </div>
+
+                      {/* Phone & Linked Token Pill */}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] opacity-60 font-mono">
+                          +{thread.phone}
+                        </span>
+                        {thread.linkedTokenNumber && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-amber-500/15 text-amber-500">
+                            {thread.linkedTokenNumber}
+                          </span>
+                        )}
+                        {thread.linkedAgentName && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-medium bg-purple-500/15 text-purple-400 truncate">
+                            {thread.linkedAgentName}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Last Message Preview with Double Checkmarks if outbound */}
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <div className="flex items-center gap-1 text-[11px] opacity-70 truncate">
+                          {isOutbound && (
+                            <CheckCheck className="w-3.5 h-3.5 text-[#53bdeb] shrink-0" />
+                          )}
+                          <span className="truncate">{lastMsg.message_text}</span>
+                        </div>
+
+                        {/* Unread Badge */}
+                        {thread.unreadCount > 0 && (
+                          <span className="bg-[#00a884] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                            {thread.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
-        ) : (
-          filteredMessages.map(msg => {
-            const cleanPhone = msg.sender_phone.replace(/\D/g, '');
-            const waLink = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(
-              `Hello ${msg.sender_name || ''}, regarding Royal Services: `
-            )}`;
+        </div>
 
-            return (
+        {/* ============================================================ */}
+        {/* RIGHT COLUMN: ACTIVE CONVERSATION CANVAS */}
+        {/* ============================================================ */}
+        <div
+          className={`${
+            !selectedPhone ? 'hidden md:flex' : 'flex'
+          } flex-1 flex-col overflow-hidden relative ${
+            darkMode ? 'bg-[#0b141a]' : 'bg-[#efeae2]'
+          }`}
+          style={{
+            backgroundImage: darkMode
+              ? 'radial-gradient(#1f2c34 1px, transparent 1px)'
+              : 'radial-gradient(#d1d7db 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
+          }}
+        >
+          {activeThread ? (
+            <>
+              {/* Active Chat Header */}
               <div
-                key={msg.id}
-                className={`bg-white rounded-2xl border transition-all p-4 md:p-5 ${
-                  !msg.is_read
-                    ? 'border-emerald-300 ring-2 ring-emerald-50 shadow-xs'
-                    : 'border-slate-200 hover:border-slate-300'
+                className={`p-3 flex items-center justify-between border-b z-10 shrink-0 ${
+                  darkMode ? 'bg-[#202c33] border-[#222d34]' : 'bg-[#f0f2f5] border-slate-200'
                 }`}
               >
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
-                  {/* Sender Details */}
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
-                        !msg.is_read
-                          ? 'bg-emerald-600 text-white ring-2 ring-emerald-100'
-                          : 'bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      {msg.sender_name ? msg.sender_name.slice(0, 2).toUpperCase() : 'WA'}
-                    </div>
+                <div className="flex items-center gap-3 min-w-0">
+                  {/* Mobile Back Button */}
+                  <button
+                    onClick={() => setSelectedPhone(null)}
+                    className="md:hidden p-1.5 rounded-lg opacity-70 hover:opacity-100"
+                    aria-label="Back to chat list"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
 
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-slate-900 text-sm">
-                          {msg.sender_name || `+${msg.sender_phone}`}
-                        </span>
-
-                        {!msg.is_read && (
-                          <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500 text-white tracking-wide uppercase">
-                            New Reply
-                          </span>
-                        )}
-
-                        {/* Linked Token Badge */}
-                        {msg.linked_token_number && (
-                          <Link
-                            href={`/admin/tokens/${msg.linked_token_id}`}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold transition-colors"
-                          >
-                            <Ticket className="w-3 h-3" />
-                            <span>{msg.linked_token_number}</span>
-                            <ExternalLink className="w-2.5 h-2.5 text-blue-500" />
-                          </Link>
-                        )}
-
-                        {/* Linked Agent Badge */}
-                        {msg.linked_agent_name && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-medium">
-                            <User className="w-3 h-3" />
-                            <span>{msg.linked_agent_name}</span>
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-3 text-xs text-slate-500">
-                        <span className="flex items-center gap-1">
-                          <Phone className="w-3 h-3 text-slate-400" />
-                          +{msg.sender_phone}
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          {formatReadableISTDateTime(msg.timestamp)}
-                        </span>
-                      </div>
-                    </div>
+                  <div
+                    className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-white font-bold text-xs shadow-xs ${getAvatarBg(
+                      activeThread.contactName
+                    )}`}
+                  >
+                    {activeThread.contactName.slice(0, 2).toUpperCase()}
                   </div>
 
-                  {/* Actions Right Side */}
-                  <div className="flex items-center gap-2 self-end md:self-auto pt-2 md:pt-0">
-                    <button
-                      onClick={() => handleToggleRead(msg)}
-                      className={`text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-colors ${
-                        msg.is_read
-                          ? 'text-slate-500 hover:text-slate-700 border-slate-200 hover:bg-slate-50'
-                          : 'text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100'
-                      }`}
-                    >
-                      {msg.is_read ? 'Mark unread' : 'Mark read'}
-                    </button>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-semibold text-xs truncate">
+                        {activeThread.contactName}
+                      </h2>
+                      <span className="text-[11px] opacity-60 font-mono">
+                        +{activeThread.phone}
+                      </span>
+                    </div>
 
-                    <a
-                      href={waLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#25D366] text-white hover:bg-[#1EBE5D] shadow-xs transition-colors"
-                      title="Open WhatsApp chat on phone or web"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5" />
-                      <span>Reply on WhatsApp</span>
-                    </a>
+                    <div className="flex items-center gap-2 text-[10px] opacity-75 mt-0.5">
+                      {activeThread.linkedTokenNumber ? (
+                        <Link
+                          href={`/admin/tokens/${activeThread.linkedTokenId || activeThread.linkedTokenNumber}`}
+                          className="hover:underline flex items-center gap-1 text-amber-400 font-semibold"
+                        >
+                          <Ticket className="w-3 h-3" />
+                          <span>Token: {activeThread.linkedTokenNumber}</span>
+                        </Link>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <Lock className="w-2.5 h-2.5 text-[#00a884]" />
+                          <span>Connected via Meta Cloud API</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* WhatsApp Chat Speech Bubble */}
-                <div className="mt-3 ml-0 md:ml-13">
-                  <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-100/90 text-slate-800 text-sm leading-relaxed whitespace-pre-wrap font-sans">
-                    {msg.message_text}
-                  </div>
+                {/* Right Action Buttons */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <a
+                    href={`https://wa.me/${activeThread.phone}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      darkMode
+                        ? 'bg-[#00a884]/20 hover:bg-[#00a884]/30 text-[#00a884]'
+                        : 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800'
+                    }`}
+                    title="Open chat in WhatsApp Desktop/Mobile"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Open in WhatsApp</span>
+                  </a>
                 </div>
               </div>
-            );
-          })
-        )}
+
+              {/* Message Stream */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 z-0">
+                {/* Security Banner */}
+                <div className="flex justify-center my-2">
+                  <div
+                    className={`max-w-md text-center px-4 py-2 rounded-lg text-[11px] shadow-xs flex items-center gap-2 ${
+                      darkMode
+                        ? 'bg-[#182229] text-[#ffd279] border border-[#222d34]'
+                        : 'bg-[#fff5c4] text-amber-900 border border-amber-200'
+                    }`}
+                  >
+                    <Lock className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      Messages are processed live via the official Meta WhatsApp Cloud API from{' '}
+                      <strong>+91 98191 43222</strong>.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Messages Feed */}
+                {activeThread.messages.map((msg, index) => {
+                  const isOutbound = msg.direction === 'outbound';
+
+                  return (
+                    <div
+                      key={msg.id || index}
+                      className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`relative max-w-[85%] sm:max-w-[70%] rounded-xl px-3 py-2 text-xs shadow-xs break-words ${
+                          isOutbound
+                            ? darkMode
+                              ? 'bg-[#005c4b] text-[#e9edef] rounded-tr-none'
+                              : 'bg-[#d9fdd3] text-slate-900 rounded-tr-none'
+                            : darkMode
+                            ? 'bg-[#202c33] text-[#e9edef] rounded-tl-none'
+                            : 'bg-white text-slate-900 rounded-tl-none'
+                        }`}
+                      >
+                        {/* Sender info if incoming */}
+                        {!isOutbound && msg.sender_name && (
+                          <div className="text-[10px] font-bold text-[#53bdeb] mb-0.5">
+                            {msg.sender_name}
+                          </div>
+                        )}
+
+                        {/* Message Body */}
+                        <div className="whitespace-pre-wrap leading-relaxed">
+                          {msg.message_text}
+                        </div>
+
+                        {/* Timestamp & Double Checkmarks */}
+                        <div className="flex items-center justify-end gap-1 mt-1 text-[10px] opacity-60">
+                          <span>{formatMsgTime(msg.timestamp)}</span>
+                          {isOutbound && (
+                            <CheckCheck className="w-3.5 h-3.5 text-[#53bdeb]" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Send Error Notice */}
+              {sendError && (
+                <div className="px-4 py-2 bg-rose-500/20 text-rose-300 text-xs flex items-center justify-between border-t border-rose-500/30">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-400" />
+                    <span>{sendError}</span>
+                  </div>
+                  <button onClick={() => setSendError(null)} className="font-bold">
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {/* Bottom Message Input Bar */}
+              <form
+                onSubmit={handleSendMessage}
+                className={`p-3 flex items-center gap-2 border-t z-10 shrink-0 ${
+                  darkMode ? 'bg-[#202c33] border-[#222d34]' : 'bg-[#f0f2f5] border-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-1 opacity-70">
+                  <button
+                    type="button"
+                    className="p-1.5 rounded-lg hover:opacity-100 transition-opacity"
+                    title="Insert emoji"
+                    onClick={() => setInputText(prev => prev + ' 👍')}
+                  >
+                    <Smile className="w-5 h-5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="p-1.5 rounded-lg hover:opacity-100 transition-opacity"
+                    title="Attach reference"
+                    onClick={() => {
+                      if (activeThread.linkedTokenNumber) {
+                        setInputText(prev => prev + ` [Token: ${activeThread.linkedTokenNumber}]`);
+                      }
+                    }}
+                  >
+                    <Paperclip className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputText}
+                  onChange={e => setInputText(e.target.value)}
+                  placeholder="Type a message"
+                  disabled={sending}
+                  className={`flex-1 px-4 py-2.5 rounded-lg outline-none text-xs transition-colors ${
+                    darkMode
+                      ? 'bg-[#2a3942] text-white placeholder-[#8696a0] focus:ring-1 focus:ring-[#00a884]'
+                      : 'bg-white text-slate-800 placeholder-slate-400 focus:ring-1 focus:ring-[#00a884]'
+                  }`}
+                />
+
+                <button
+                  type="submit"
+                  disabled={!inputText.trim() || sending}
+                  className={`p-2.5 rounded-full text-white font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                    inputText.trim()
+                      ? 'bg-[#00a884] hover:bg-[#029072] scale-100'
+                      : 'bg-slate-600 scale-95'
+                  }`}
+                  title="Send message (Enter)"
+                >
+                  {sending ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </button>
+              </form>
+            </>
+          ) : (
+            /* Empty State: No chat selected */
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center opacity-70 space-y-4">
+              <div
+                className={`w-20 h-20 rounded-full flex items-center justify-center ${
+                  darkMode ? 'bg-[#202c33]' : 'bg-slate-200'
+                }`}
+              >
+                <MessageSquareText className="w-10 h-10 text-[#00a884]" />
+              </div>
+              <div className="max-w-md space-y-1.5">
+                <h3 className="font-bold text-base">Royal Services WhatsApp Web</h3>
+                <p className="text-xs opacity-75">
+                  Send and receive WhatsApp messages directly from the website without switching
+                  to another device or app.
+                </p>
+                <p className="text-[11px] opacity-60">
+                  Select a chat on the left to start viewing messages and typing replies.
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] opacity-50 mt-4">
+                <Lock className="w-3.5 h-3.5 text-[#00a884]" />
+                <span>Connected to Meta WhatsApp Cloud API (+91 98191 43222)</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

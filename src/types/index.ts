@@ -188,9 +188,24 @@ export interface WhatsAppInboxMessage {
   media_url?: string;
   timestamp: string; // ISO 8601
   is_read: boolean;
+  direction?: 'inbound' | 'outbound'; // 'inbound' from contact, 'outbound' from admin
   linked_token_id?: string;
   linked_token_number?: string;
   linked_agent_id?: string;
   linked_agent_name?: string;
 }
+
+export interface WhatsAppChatThread {
+  phone: string;
+  contactName: string;
+  lastMessage: WhatsAppInboxMessage;
+  unreadCount: number;
+  totalMessages: number;
+  messages: WhatsAppInboxMessage[];
+  linkedTokenNumber?: string;
+  linkedTokenId?: string;
+  linkedAgentName?: string;
+  linkedAgentId?: string;
+}
+
 

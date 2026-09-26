@@ -15,6 +15,7 @@ import {
   TemplatePlaceholder,
   TokenRecipient,
   WhatsAppInboxMessage,
+  WhatsAppChatThread,
 } from '@/types';
 import fs from 'fs';
 import path from 'path';
@@ -1765,6 +1766,7 @@ export function recordIncomingWhatsAppMessage(input: {
     media_url: input.media_url,
     timestamp: input.timestamp || new Date().toISOString(),
     is_read: false,
+    direction: 'inbound',
     linked_token_id: matchedToken?.id,
     linked_token_number: matchedToken?.token_number,
     linked_agent_id: matchedAgent?.id,
@@ -1851,4 +1853,149 @@ export function markAllInboxMessagesRead(): number {
   }
   return updated;
 }
+
+export function recordOutboundWhatsAppMessage(input: {
+  provider_message_id: string;
+  recipient_phone: string;
+  recipient_name?: string;
+  message_text: string;
+  linked_token_id?: string;
+  linked_token_number?: string;
+  linked_agent_id?: string;
+  linked_agent_name?: string;
+}): WhatsAppInboxMessage {
+  const store = getStore();
+  if (!store.inboxMessages) store.inboxMessages = [];
+
+  const cleanRecipient = cleanPhoneForMatch(input.recipient_phone);
+  const matchedAgent = store.agents.find(a => cleanPhoneForMatch(a.mobile) === cleanRecipient);
+  const matchedToken = store.tokens.find(t => {
+    if (cleanPhoneForMatch(t.agent_mobile_number) === cleanRecipient) return true;
+    if (Array.isArray(t.assigned_recipients)) {
+      return t.assigned_recipients.some(r => cleanPhoneForMatch(r.mobile) === cleanRecipient);
+    }
+    return false;
+  });
+
+  const resolvedName =
+    input.recipient_name?.trim() ||
+    matchedAgent?.name ||
+    matchedToken?.associate_name ||
+    `+${input.recipient_phone}`;
+
+  const outboundMsg: WhatsAppInboxMessage = {
+    id: `outbox-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 6)}`,
+    provider_message_id: input.provider_message_id,
+    sender_phone: input.recipient_phone,
+    sender_name: resolvedName,
+    message_text: input.message_text,
+    message_type: 'text',
+    timestamp: new Date().toISOString(),
+    is_read: true,
+    direction: 'outbound',
+    linked_token_id: input.linked_token_id || matchedToken?.id,
+    linked_token_number: input.linked_token_number || matchedToken?.token_number,
+    linked_agent_id: input.linked_agent_id || matchedAgent?.id,
+    linked_agent_name: input.linked_agent_name || matchedAgent?.name,
+  };
+
+  store.inboxMessages.unshift(outboundMsg);
+
+  recordActivityLog({
+    action: 'whatsapp_message_sent',
+    target_type: 'reminder',
+    target_id: outboundMsg.linked_token_number || input.recipient_phone,
+    summary: `Sent WhatsApp message to ${resolvedName} (${input.recipient_phone}): "${input.message_text.slice(0, 60)}"`,
+    details: {
+      provider_message_id: input.provider_message_id,
+      token_number: outboundMsg.linked_token_number,
+      agent_name: outboundMsg.linked_agent_name,
+    },
+  });
+
+  notifyStoreChanged();
+  return outboundMsg;
+}
+
+export function markThreadRead(phone: string): number {
+  const store = getStore();
+  const clean = cleanPhoneForMatch(phone);
+  const all = store.inboxMessages || [];
+  let count = 0;
+  for (const m of all) {
+    if (cleanPhoneForMatch(m.sender_phone) === clean && !m.is_read) {
+      m.is_read = true;
+      count++;
+    }
+  }
+  if (count > 0) {
+    notifyStoreChanged();
+  }
+  return count;
+}
+
+export function getInboxThreads(search?: string): WhatsAppChatThread[] {
+  const store = getStore();
+  const messages = [...(store.inboxMessages || [])];
+
+  const threadMap = new Map<string, WhatsAppInboxMessage[]>();
+  for (const msg of messages) {
+    const key = cleanPhoneForMatch(msg.sender_phone) || msg.sender_phone;
+    const list = threadMap.get(key) || [];
+    list.push(msg);
+    threadMap.set(key, list);
+  }
+
+  const threads: WhatsAppChatThread[] = [];
+
+  threadMap.forEach((msgs) => {
+    // Sort chronological: oldest first, latest last
+    msgs.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const lastMsg = msgs[msgs.length - 1];
+    const unreadCount = msgs.filter(m => !m.is_read && m.direction !== 'outbound').length;
+
+    const contactName =
+      msgs.find(m => m.sender_name && !m.sender_name.startsWith('+'))?.sender_name ||
+      lastMsg.sender_name ||
+      `+${lastMsg.sender_phone}`;
+
+    const linkedTokenNumber = msgs.find(m => m.linked_token_number)?.linked_token_number;
+    const linkedTokenId = msgs.find(m => m.linked_token_id)?.linked_token_id;
+    const linkedAgentName = msgs.find(m => m.linked_agent_name)?.linked_agent_name;
+    const linkedAgentId = msgs.find(m => m.linked_agent_id)?.linked_agent_id;
+
+    threads.push({
+      phone: lastMsg.sender_phone,
+      contactName,
+      lastMessage: lastMsg,
+      unreadCount,
+      totalMessages: msgs.length,
+      messages: msgs,
+      linkedTokenNumber,
+      linkedTokenId,
+      linkedAgentName,
+      linkedAgentId,
+    });
+  });
+
+  // Sort threads by latest message timestamp descending
+  threads.sort(
+    (a, b) => new Date(b.lastMessage.timestamp).getTime() - new Date(a.lastMessage.timestamp).getTime()
+  );
+
+  if (search && search.trim()) {
+    const q = search.toLowerCase().trim();
+    return threads.filter(
+      t =>
+        t.contactName.toLowerCase().includes(q) ||
+        t.phone.includes(q) ||
+        (t.linkedTokenNumber && t.linkedTokenNumber.toLowerCase().includes(q)) ||
+        (t.linkedAgentName && t.linkedAgentName.toLowerCase().includes(q)) ||
+        t.lastMessage.message_text.toLowerCase().includes(q)
+    );
+  }
+
+  return threads;
+}
+
 
