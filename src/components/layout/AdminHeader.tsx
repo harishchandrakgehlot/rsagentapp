@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Clock, ExternalLink } from 'lucide-react';
+import { Plus, Clock, ExternalLink, MessageSquareText } from 'lucide-react';
 import { getCurrentISTDateString, formatReadableISTDate } from '@/lib/ist';
 
 interface Props {
@@ -18,6 +18,7 @@ interface Props {
 
 export function AdminHeader({ title, subtitle, action }: Props) {
   const [istTime, setIstTime] = useState<string>('');
+  const [unreadInboxCount, setUnreadInboxCount] = useState<number>(0);
 
   useEffect(() => {
     const updateTime = () => {
@@ -37,6 +38,27 @@ export function AdminHeader({ title, subtitle, action }: Props) {
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    const fetchInboxUnread = async () => {
+      try {
+        const res = await fetch('/api/inbox?limit=1');
+        if (res.ok) {
+          const data = await res.json();
+          if (!ignore && typeof data.unreadCount === 'number') {
+            setUnreadInboxCount(data.unreadCount);
+          }
+        }
+      } catch {}
+    };
+    fetchInboxUnread();
+    const interval = setInterval(fetchInboxUnread, 30000);
+    return () => {
+      ignore = true;
+      clearInterval(interval);
+    };
   }, []);
 
   return (
@@ -60,6 +82,20 @@ export function AdminHeader({ title, subtitle, action }: Props) {
         </div>
 
         <div className="flex items-center gap-3">
+          <Link
+            href="/admin/inbox"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-200"
+            title="View WhatsApp Client Replies"
+          >
+            <MessageSquareText className="w-3.5 h-3.5 text-emerald-700" />
+            <span>WhatsApp Inbox</span>
+            {unreadInboxCount > 0 && (
+              <span className="bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {unreadInboxCount}
+              </span>
+            )}
+          </Link>
+
           <Link
             href="/"
             target="_blank"

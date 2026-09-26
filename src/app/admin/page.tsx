@@ -22,6 +22,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Check,
+  MessageSquareText,
 } from 'lucide-react';
 
 
@@ -34,11 +35,17 @@ export default function AdminDashboardPage() {
   const [fetchError, setFetchError] = useState(false);
   const [evaluatingReminders, setEvaluatingReminders] = useState(false);
   const [evalMessage, setEvalMessage] = useState('');
+  const [inboxUnread, setInboxUnread] = useState(0);
+  const [inboxTotal, setInboxTotal] = useState(0);
 
   const fetchDashboardData = async () => {
     setFetchError(false);
     try {
-      const res = await fetch('/api/dashboard');
+      const [res, inboxRes] = await Promise.all([
+        fetch('/api/dashboard'),
+        fetch('/api/inbox?limit=1'),
+      ]);
+
       if (res.status === 401) {
         router.push('/admin/login');
         return;
@@ -51,6 +58,12 @@ export default function AdminDashboardPage() {
       } else {
         setFetchError(true);
       }
+
+      if (inboxRes.ok) {
+        const inboxData = await inboxRes.json();
+        if (typeof inboxData.unreadCount === 'number') setInboxUnread(inboxData.unreadCount);
+        if (typeof inboxData.totalMessages === 'number') setInboxTotal(inboxData.totalMessages);
+      }
     } catch {
       setFetchError(true);
     } finally {
@@ -62,7 +75,11 @@ export default function AdminDashboardPage() {
     let ignore = false;
     (async () => {
       try {
-        const res = await fetch('/api/dashboard');
+        const [res, inboxRes] = await Promise.all([
+          fetch('/api/dashboard'),
+          fetch('/api/inbox?limit=1'),
+        ]);
+
         if (res.status === 401) {
           router.push('/admin/login');
           return;
@@ -77,6 +94,14 @@ export default function AdminDashboardPage() {
           }
         } else if (!ignore) {
           setFetchError(true);
+        }
+
+        if (inboxRes.ok) {
+          const inboxData = await inboxRes.json();
+          if (!ignore) {
+            if (typeof inboxData.unreadCount === 'number') setInboxUnread(inboxData.unreadCount);
+            if (typeof inboxData.totalMessages === 'number') setInboxTotal(inboxData.totalMessages);
+          }
         }
       } catch {
         if (!ignore) {
@@ -277,8 +302,39 @@ export default function AdminDashboardPage() {
         </Link>
       </div>
 
-      {/* Secondary Metrics Bar (Due Soon, WhatsApp status, Archived) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Secondary Metrics Bar (WhatsApp Inbox, Due Soon, WhatsApp status, Archived) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* WhatsApp Client Inbox & Replies */}
+        <Link
+          href="/admin/inbox"
+          className="bg-white p-4 rounded-2xl border border-emerald-200 shadow-2xs hover:border-emerald-400 hover:shadow-md transition-all flex items-center justify-between group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-700 group-hover:scale-110 transition-transform">
+              <MessageSquareText className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                  WhatsApp Inbox
+                </p>
+                {inboxUnread > 0 && (
+                  <span className="bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                    {inboxUnread} new
+                  </span>
+                )}
+              </div>
+              <p className="text-lg font-bold text-slate-900 font-mono">
+                {inboxTotal} Repl{inboxTotal === 1 ? 'y' : 'ies'}
+              </p>
+            </div>
+          </div>
+          <span className="text-xs text-emerald-700 font-medium flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+            <span>Open</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </span>
+        </Link>
+
         {/* Reminders Due Soon - FR 012 */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
           <div className="flex items-center gap-3">
