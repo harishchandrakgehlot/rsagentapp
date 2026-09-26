@@ -27,6 +27,9 @@ import {
   CheckCircle2,
   User,
   QrCode,
+  MapPin,
+  Calendar,
+  X,
 } from 'lucide-react';
 
 const STORAGE_KEY = 'rs_agent_auth_session';
@@ -41,7 +44,11 @@ type SortOption =
 
 type FilterOption = 'all' | 'active' | 'expiring_soon' | 'expired';
 
-export function AgentTokenTracker() {
+interface Props {
+  onStepChange?: (step: 'mobile' | 'otp' | 'dashboard') => void;
+}
+
+export function AgentTokenTracker({ onStepChange }: Props) {
   // Authentication states
   const [step, setStep] = useState<'mobile' | 'otp' | 'dashboard'>('mobile');
   const [mobileInput, setMobileInput] = useState('');
@@ -69,6 +76,12 @@ export function AgentTokenTracker() {
   const [sortOption, setSortOption] = useState<SortOption>('expiry_asc');
   const [filterOption, setFilterOption] = useState<FilterOption>('all');
 
+  // Notify parent on step change
+  const updateStep = (newStep: 'mobile' | 'otp' | 'dashboard') => {
+    setStep(newStep);
+    onStepChange?.(newStep);
+  };
+
   // Fetch tokens using verified auth token
   const fetchTokensWithAuth = async (tokenStr: string, isMounted: () => boolean = () => true) => {
     setLoading(true);
@@ -87,7 +100,7 @@ export function AgentTokenTracker() {
           const ph = data.phone;
           setMaskedPhone(`+91 ${ph.slice(-10, -4).replace(/\d/g, '•')} ${ph.slice(-4)}`);
         }
-        setStep('dashboard');
+        updateStep('dashboard');
 
         // Automatically expand the first token if there's only 1 or 2
         if (data.tokens?.length > 0 && data.tokens.length <= 2) {
@@ -97,12 +110,12 @@ export function AgentTokenTracker() {
         // Token expired or invalid
         localStorage.removeItem(STORAGE_KEY);
         setAuthToken('');
-        setStep('mobile');
+        updateStep('mobile');
       }
     } catch {
       if (!isMounted()) return;
       setErrorMessage('Unable to connect to the registry. Please check your internet connection.');
-      setStep('mobile');
+      updateStep('mobile');
     } finally {
       if (isMounted()) {
         setLoading(false);
@@ -127,6 +140,7 @@ export function AgentTokenTracker() {
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Cooldown timer for OTP resend
@@ -162,7 +176,7 @@ export function AgentTokenTracker() {
         if (data.agentName) setAgentName(data.agentName);
         if (data.devPreviewOtp) setDevCode(data.devPreviewOtp);
         setResendCooldown(60);
-        setStep('otp');
+        updateStep('otp');
       } else {
         setErrorMessage(data.error || 'Failed to dispatch verification code. Please check your number.');
       }
@@ -196,7 +210,7 @@ export function AgentTokenTracker() {
         setTokens(data.tokens || []);
         if (data.agentName) setAgentName(data.agentName);
         localStorage.setItem(STORAGE_KEY, data.authToken);
-        setStep('dashboard');
+        updateStep('dashboard');
 
         if (data.tokens?.length > 0 && data.tokens.length <= 2) {
           setExpandedTokenIds(new Set([data.tokens[0].id]));
@@ -220,7 +234,7 @@ export function AgentTokenTracker() {
     setOtpInput('');
     setDevCode(null);
     setExpandedTokenIds(new Set());
-    setStep('mobile');
+    updateStep('mobile');
   };
 
   // Toggle Accordion Item
@@ -235,7 +249,7 @@ export function AgentTokenTracker() {
         // Generate QR code on demand
         if (!qrCodeUrls[id]) {
           const publicUrl = `${window.location.origin}/track/${encodeURIComponent(token.token_number)}`;
-          QRCode.toDataURL(publicUrl, { width: 160, margin: 1 })
+          QRCode.toDataURL(publicUrl, { width: 180, margin: 1, color: { dark: '#0b1426', light: '#ffffff' } })
             .then(url => setQrCodeUrls(old => ({ ...old, [id]: url })))
             .catch(() => {});
         }
@@ -328,9 +342,9 @@ export function AgentTokenTracker() {
   // Initial checking spinner
   if (initialChecking) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 space-y-4">
+      <div className="flex flex-col items-center justify-center py-20 space-y-3">
         <RefreshCw className="w-8 h-8 text-blue-400 animate-spin" />
-        <p className="text-xs text-slate-400">Verifying secure agent registry session...</p>
+        <p className="text-xs text-slate-400 tracking-wide font-medium">Verifying agent session...</p>
       </div>
     );
   }
@@ -340,23 +354,23 @@ export function AgentTokenTracker() {
   // -------------------------------------------------------------
   if (step === 'mobile') {
     return (
-      <div className="bg-[#1C2552]/90 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-[#2D3774] shadow-2xl max-w-xl mx-auto w-full">
+      <div className="bg-slate-900/90 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl max-w-lg mx-auto w-full transition-all">
         <div className="text-center space-y-2 mb-6">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto shadow-inner">
             <Phone className="w-6 h-6" />
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-            Track All Your Tokens
+            Agent WhatsApp Login
           </h2>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
-            Enter your registered WhatsApp mobile number. We will send you a one-time verification code (OTP) to securely access all your tokens in one view.
+          <p className="text-xs sm:text-sm text-slate-400 max-w-sm mx-auto leading-relaxed">
+            Enter your mobile number to receive a secure 6-digit OTP directly on WhatsApp to track all your assigned tokens.
           </p>
         </div>
 
         <form onSubmit={handleSendOtp} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-              Registered WhatsApp Mobile Number
+            <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2">
+              Registered WhatsApp Mobile
             </label>
             <div className="relative flex items-center">
               <span className="absolute left-4 text-xs font-bold text-slate-400 select-none">
@@ -371,7 +385,7 @@ export function AgentTokenTracker() {
                 }}
                 maxLength={13}
                 placeholder="98191 43222"
-                className="w-full pl-16 pr-4 py-3.5 text-sm sm:text-base font-mono rounded-2xl bg-[#0F1633] border border-[#2D3774] focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-white placeholder:text-slate-500 shadow-inner"
+                className="w-full pl-16 pr-4 py-3.5 text-sm sm:text-base font-mono rounded-2xl bg-slate-950/80 border border-slate-700/80 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-white placeholder:text-slate-500 shadow-inner"
                 autoFocus
               />
             </div>
@@ -397,15 +411,16 @@ export function AgentTokenTracker() {
             ) : (
               <>
                 <ShieldCheck className="w-5 h-5" />
-                <span>Get OTP on WhatsApp</span>
+                <span>Send WhatsApp OTP</span>
               </>
             )}
           </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-slate-700/60 text-center">
-          <p className="text-[11px] text-slate-400">
-            🔒 Secure India Standard Time (IST) WhatsApp verification. Token tracking is strictly limited to authorized numbers.
+        <div className="mt-6 pt-5 border-t border-slate-800 text-center">
+          <p className="text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Encrypted WhatsApp verification • Only authorized numbers can view records</span>
           </p>
         </div>
       </div>
@@ -417,7 +432,7 @@ export function AgentTokenTracker() {
   // -------------------------------------------------------------
   if (step === 'otp') {
     return (
-      <div className="bg-[#1C2552]/90 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-[#2D3774] shadow-2xl max-w-xl mx-auto w-full">
+      <div className="bg-slate-900/90 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl max-w-lg mx-auto w-full transition-all">
         <div className="text-center space-y-2 mb-6">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto shadow-inner">
             <KeyRound className="w-6 h-6" />
@@ -425,8 +440,8 @@ export function AgentTokenTracker() {
           <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
             Enter WhatsApp Verification Code
           </h2>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
-            We sent a 6-digit verification code to your WhatsApp at{' '}
+          <p className="text-xs sm:text-sm text-slate-300 max-w-sm mx-auto leading-relaxed">
+            We sent a 6-digit code to your WhatsApp at{' '}
             <strong className="text-white font-mono">{maskedPhone}</strong>.
           </p>
         </div>
@@ -446,7 +461,7 @@ export function AgentTokenTracker() {
 
         <form onSubmit={handleVerifyOtp} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 text-center">
+            <label className="block text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-2 text-center">
               6-Digit OTP
             </label>
             <input
@@ -459,7 +474,7 @@ export function AgentTokenTracker() {
                 if (errorMessage) setErrorMessage(null);
               }}
               placeholder="• • • • • •"
-              className="w-full text-center py-4 text-2xl sm:text-3xl font-mono tracking-[0.5em] rounded-2xl bg-[#0F1633] border border-[#2D3774] focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-white placeholder:text-slate-600 shadow-inner"
+              className="w-full text-center py-3.5 text-2xl sm:text-3xl font-mono tracking-[0.4em] rounded-2xl bg-slate-950/80 border border-slate-700/80 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 text-white placeholder:text-slate-600 shadow-inner"
               autoFocus
             />
           </div>
@@ -479,24 +494,24 @@ export function AgentTokenTracker() {
             {loading ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Verifying Code...</span>
+                <span>Verifying...</span>
               </>
             ) : (
               <>
                 <CheckCircle2 className="w-5 h-5" />
-                <span>Verify & Access All My Tokens</span>
+                <span>Verify & View My Tokens</span>
               </>
             )}
           </button>
         </form>
 
-        <div className="mt-6 pt-4 border-t border-slate-700/60 flex items-center justify-between text-xs">
+        <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs">
           <button
             type="button"
             onClick={handleLogout}
             className="text-slate-400 hover:text-white transition-colors"
           >
-            ← Change Mobile Number
+            ← Change Number
           </button>
 
           {resendCooldown > 0 ? (
@@ -521,90 +536,98 @@ export function AgentTokenTracker() {
   // STEP 3: AUTHENTICATED AGENT MULTI-TOKEN DASHBOARD
   // -------------------------------------------------------------
   return (
-    <div className="space-y-6 w-full max-w-4xl mx-auto">
-      {/* Agent Welcome & Summary Header */}
-      <div className="bg-[#1C2552]/90 backdrop-blur-md p-6 sm:p-8 rounded-3xl border border-[#2D3774] shadow-2xl flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Verified WhatsApp Agent</span>
-            </span>
-            <span className="text-xs text-slate-400 font-mono">{maskedPhone}</span>
+    <div className="space-y-6 w-full max-w-5xl mx-auto">
+      {/* Sleek Agent Executive Header */}
+      <div className="bg-slate-900/90 backdrop-blur-xl rounded-3xl border border-slate-800 shadow-2xl p-6 sm:p-7">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 pb-6 border-b border-slate-800/80">
+          <div className="flex items-center gap-4">
+            <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-cyan-500 text-white font-bold text-xl flex items-center justify-center shadow-lg shadow-emerald-900/30 shrink-0">
+              {agentName.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                  {agentName}
+                </h1>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>WhatsApp Verified</span>
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1 flex items-center gap-2 font-mono">
+                <span>{maskedPhone}</span>
+                <span>•</span>
+                <span className="text-slate-400">IST Node Synchronized</span>
+              </p>
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Welcome, {agentName}
-          </h1>
-          <p className="text-xs text-slate-300">
-            Track and monitor all your assigned Royal Services tokens in one place.
-          </p>
+
+          <div className="flex items-center gap-2.5 self-start md:self-auto">
+            <button
+              type="button"
+              onClick={() => fetchTokensWithAuth(authToken)}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all cursor-pointer"
+              title="Refresh Token List"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-800/50 text-xs font-semibold transition-all cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Switch Phone</span>
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => fetchTokensWithAuth(authToken)}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0F1633] hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-semibold transition-colors"
-            title="Refresh Token List"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </button>
+        {/* Integrated KPI Summary Strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-6">
+          <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+              Total Tokens
+            </span>
+            <span className="text-2xl font-black font-mono text-white mt-1 block">
+              {metrics.total}
+            </span>
+          </div>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-800/50 text-xs font-semibold transition-colors"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Switch Phone</span>
-          </button>
-        </div>
-      </div>
+          <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 block">
+              Active Tokens
+            </span>
+            <span className="text-2xl font-black font-mono text-emerald-400 mt-1 block">
+              {metrics.active}
+            </span>
+          </div>
 
-      {/* KPI Stats Counter */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-[#1C2552]/60 p-4 rounded-2xl border border-[#2D3774]/60">
-          <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 block">
-            Total Tokens
-          </span>
-          <span className="text-2xl font-bold font-mono text-white mt-1 block">
-            {metrics.total}
-          </span>
-        </div>
+          <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 block">
+              Expiring &lt; 30 Days
+            </span>
+            <span className="text-2xl font-black font-mono text-amber-400 mt-1 block">
+              {metrics.expiringSoon}
+            </span>
+          </div>
 
-        <div className="bg-[#1C2552]/60 p-4 rounded-2xl border border-[#2D3774]/60">
-          <span className="text-[11px] uppercase tracking-wider font-semibold text-emerald-400 block">
-            Active Tokens
-          </span>
-          <span className="text-2xl font-bold font-mono text-emerald-400 mt-1 block">
-            {metrics.active}
-          </span>
-        </div>
-
-        <div className="bg-[#1C2552]/60 p-4 rounded-2xl border border-[#2D3774]/60">
-          <span className="text-[11px] uppercase tracking-wider font-semibold text-amber-400 block">
-            Expiring &lt; 30d
-          </span>
-          <span className="text-2xl font-bold font-mono text-amber-400 mt-1 block">
-            {metrics.expiringSoon}
-          </span>
-        </div>
-
-        <div className="bg-[#1C2552]/60 p-4 rounded-2xl border border-[#2D3774]/60">
-          <span className="text-[11px] uppercase tracking-wider font-semibold text-rose-400 block">
-            Expired
-          </span>
-          <span className="text-2xl font-bold font-mono text-rose-400 mt-1 block">
-            {metrics.expired}
-          </span>
+          <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-400 block">
+              Expired
+            </span>
+            <span className="text-2xl font-black font-mono text-rose-400 mt-1 block">
+              {metrics.expired}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Control Toolbar: Sort Option + Filter Tabs + Search */}
-      <div className="bg-[#1C2552]/90 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-[#2D3774] shadow-xl space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* Streamlined Filter & Sort Toolbar */}
+      <div className="bg-slate-900/90 backdrop-blur-xl p-4 sm:p-5 rounded-2xl border border-slate-800 shadow-xl space-y-3.5">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           {/* Status Filter Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             {(
@@ -619,10 +642,10 @@ export function AgentTokenTracker() {
                 key={tab.key}
                 type="button"
                 onClick={() => setFilterOption(tab.key)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                   filterOption === tab.key
-                    ? 'bg-[#2D3774] text-white shadow-md border border-[#4555A8]'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40 border border-blue-500'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                 }`}
               >
                 {tab.label}
@@ -630,16 +653,16 @@ export function AgentTokenTracker() {
             ))}
           </div>
 
-          {/* Sort Dropdown — Exactly as requested by user */}
+          {/* Sort Dropdown */}
           <div className="flex items-center gap-2 self-start md:self-auto">
-            <ArrowUpDown className="w-3.5 h-3.5 text-blue-300 shrink-0" />
-            <span className="text-xs text-slate-300 whitespace-nowrap font-medium">
+            <ArrowUpDown className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <span className="text-xs text-slate-400 whitespace-nowrap font-medium">
               Sort by:
             </span>
             <select
               value={sortOption}
               onChange={e => setSortOption(e.target.value as SortOption)}
-              className="bg-[#0F1633] text-white border border-[#2D3774] text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-blue-400 cursor-pointer shadow-inner"
+              className="bg-slate-950 text-slate-200 border border-slate-700 text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-blue-400 cursor-pointer shadow-inner"
             >
               <option value="expiry_asc">⏳ Expiry Date (Soonest first)</option>
               <option value="expiry_desc">⏳ Expiry Date (Furthest first)</option>
@@ -653,21 +676,30 @@ export function AgentTokenTracker() {
 
         {/* Real-time search bar */}
         <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search by Token Number, Client Name, Property or City..."
-            className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm rounded-xl bg-[#0F1633] border border-[#2D3774] focus:border-blue-400 focus:outline-none text-white placeholder:text-slate-500 shadow-inner"
+            className="w-full pl-10 pr-9 py-2 text-xs sm:text-sm rounded-xl bg-slate-950 border border-slate-800 focus:border-blue-500 focus:outline-none text-white placeholder:text-slate-500 shadow-inner"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Accordion Token List — Exactly as requested by user ("multiple ancor drop downs with token number and Client name") */}
+      {/* Accordion Token List */}
       {filteredAndSortedTokens.length === 0 ? (
-        <div className="bg-[#1C2552]/40 rounded-3xl border border-[#2D3774]/60 p-12 text-center space-y-3">
-          <Building2 className="w-8 h-8 text-slate-500 mx-auto" />
+        <div className="bg-slate-900/60 rounded-3xl border border-slate-800 p-12 text-center space-y-3">
+          <Building2 className="w-9 h-9 text-slate-600 mx-auto" />
           <h3 className="text-base font-bold text-white">No Tokens Match Your Filter</h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
             {searchQuery
@@ -681,7 +713,7 @@ export function AgentTokenTracker() {
                 setSearchQuery('');
                 setFilterOption('all');
               }}
-              className="text-xs text-blue-300 hover:text-white underline pt-1 cursor-pointer"
+              className="text-xs text-blue-400 hover:text-blue-300 font-semibold underline pt-1 cursor-pointer"
             >
               Reset Search &amp; Filters
             </button>
@@ -697,18 +729,18 @@ export function AgentTokenTracker() {
             return (
               <div
                 key={token.id}
-                className="bg-[#1C2552]/90 backdrop-blur-md rounded-2xl border border-[#2D3774] shadow-lg overflow-hidden transition-all duration-200 hover:border-[#3E4D99]"
+                className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-lg overflow-hidden transition-all duration-200 hover:border-slate-700"
               >
                 {/* Accordion Anchor Header */}
                 <button
                   type="button"
                   onClick={() => toggleTokenExpand(token)}
-                  className="w-full p-4 sm:p-5 flex items-center justify-between text-left cursor-pointer transition-colors hover:bg-white/[0.02]"
+                  className="w-full p-4 sm:p-5 flex items-center justify-between text-left cursor-pointer transition-colors hover:bg-slate-800/40"
                   aria-expanded={isExpanded}
                 >
                   <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 pr-4">
                     {/* Token Number Badge */}
-                    <span className="font-mono font-bold text-sm sm:text-base text-blue-300 bg-[#0F1633] px-3 py-1.5 rounded-xl border border-blue-900/60 shadow-inner shrink-0">
+                    <span className="font-mono font-bold text-sm sm:text-base text-cyan-300 bg-slate-950 px-3 py-1.5 rounded-xl border border-cyan-900/50 shadow-inner shrink-0">
                       {token.token_number}
                     </span>
 
@@ -733,7 +765,7 @@ export function AgentTokenTracker() {
                   {/* Right Side: Expiry Summary & Expand Anchor Chevron */}
                   <div className="flex items-center gap-3 sm:gap-5 shrink-0">
                     <div className="text-right hidden sm:block">
-                      <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">
+                      <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">
                         Expires
                       </span>
                       <span
@@ -747,7 +779,7 @@ export function AgentTokenTracker() {
                       >
                         {formatReadableISTDate(token.end_date)}
                       </span>
-                      <span className="text-[10px] text-slate-400 block">
+                      <span className="text-[10px] text-slate-400 block font-medium">
                         {daysLeft < 0
                           ? `Expired ${Math.abs(daysLeft)}d ago`
                           : daysLeft === 0
@@ -756,9 +788,9 @@ export function AgentTokenTracker() {
                       </span>
                     </div>
 
-                    <div className="p-2 rounded-xl bg-slate-800/80 border border-slate-700 text-blue-300">
+                    <div className="p-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 group-hover:border-slate-600 transition-colors">
                       {isExpanded ? (
-                        <ChevronUp className="w-4 h-4" />
+                        <ChevronUp className="w-4 h-4 text-cyan-400" />
                       ) : (
                         <ChevronDown className="w-4 h-4" />
                       )}
@@ -766,26 +798,26 @@ export function AgentTokenTracker() {
                   </div>
                 </button>
 
-                {/* Expanded Full Details — Displayed when user opens the dropdown */}
+                {/* Expanded Full Details */}
                 {isExpanded && (
-                  <div className="border-t border-[#2D3774]/70 p-5 sm:p-6 bg-[#161E42]/80 space-y-6 text-xs sm:text-sm">
+                  <div className="border-t border-slate-800/80 p-5 sm:p-6 bg-slate-950/70 space-y-6 text-xs sm:text-sm">
                     {/* Grid of full details */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       {/* Left Column: Property & Address */}
                       <div className="space-y-4">
-                        <div className="p-4 rounded-xl bg-[#0F1633]/80 border border-slate-800 space-y-2">
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                            Assigned Property Details
+                        <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Assigned Property &amp; Address</span>
                           </span>
-                          <div className="flex items-start gap-2 text-white font-semibold">
-                            <Building2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                            <span>{token.property?.name || 'Property'}</span>
+                          <div className="text-white font-bold text-sm">
+                            {token.property?.name || 'Property'}
                           </div>
                           {(token.property?.plot_house_no ||
                             token.property?.address_line_1 ||
                             token.property?.landmark ||
                             token.property?.city) && (
-                            <p className="text-xs text-slate-300 leading-relaxed pl-6">
+                            <p className="text-xs text-slate-300 leading-relaxed">
                               {[
                                 token.property.plot_house_no,
                                 token.property.address_line_1,
@@ -802,26 +834,27 @@ export function AgentTokenTracker() {
                         </div>
 
                         {/* Validity Dates in IST */}
-                        <div className="p-4 rounded-xl bg-[#0F1633]/80 border border-slate-800 space-y-2">
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                            Validity Period (IST)
+                        <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                            <span>Validity Period (IST)</span>
                           </span>
-                          <div className="flex items-center gap-3">
-                            <div className="bg-slate-900 px-3 py-2 rounded-lg border border-slate-700">
-                              <span className="text-[10px] text-slate-400 block uppercase">Start Date</span>
-                              <span className="font-mono font-bold text-slate-200">
+                          <div className="flex items-center gap-2.5">
+                            <div className="bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 flex-1">
+                              <span className="text-[10px] text-slate-400 block uppercase font-bold">Start Date</span>
+                              <span className="font-mono font-bold text-slate-200 text-xs">
                                 {formatReadableISTDate(token.start_date)}
                               </span>
                             </div>
-                            <span className="text-slate-500 font-bold">→</span>
-                            <div className="bg-slate-900 px-3 py-2 rounded-lg border border-slate-700">
-                              <span className="text-[10px] text-slate-400 block uppercase">End Date</span>
-                              <span className="font-mono font-bold text-slate-200">
+                            <span className="text-slate-600 font-bold">→</span>
+                            <div className="bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 flex-1">
+                              <span className="text-[10px] text-slate-400 block uppercase font-bold">End Date</span>
+                              <span className="font-mono font-bold text-slate-200 text-xs">
                                 {formatReadableISTDate(token.end_date)}
                               </span>
                             </div>
                           </div>
-                          <p className="text-[11px] text-slate-400 pt-1">
+                          <p className="text-[11px] text-slate-400">
                             {daysLeft < 0
                               ? `Token expired ${Math.abs(daysLeft)} calendar day(s) ago.`
                               : daysLeft === 0
@@ -834,12 +867,12 @@ export function AgentTokenTracker() {
                       {/* Right Column: Agent & QR Code */}
                       <div className="space-y-4">
                         {/* Authorized Representative & Recipients */}
-                        <div className="p-4 rounded-xl bg-[#0F1633]/80 border border-slate-800 space-y-2">
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                            Assigned Agent &amp; Recipients
+                        <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>Authorized Agent &amp; Notifications</span>
                           </span>
                           <div className="flex items-center gap-2 text-white font-semibold">
-                            <User className="w-4 h-4 text-blue-400 shrink-0" />
                             <span>{token.agent?.name || 'Primary Agent'}</span>
                             {token.agent_mobile_number && (
                               <span className="text-xs font-mono text-slate-400">
@@ -851,15 +884,15 @@ export function AgentTokenTracker() {
                           {/* Multiple Assigned Recipients */}
                           {Array.isArray(token.assigned_recipients) &&
                             token.assigned_recipients.length > 0 && (
-                              <div className="mt-2 pt-2 border-t border-slate-800/80 space-y-1">
+                              <div className="mt-2 pt-2 border-t border-slate-800 space-y-1">
                                 <span className="text-[10px] uppercase font-bold text-slate-400">
-                                  WhatsApp Notification Recipients:
+                                  WhatsApp Recipients:
                                 </span>
                                 <div className="flex flex-wrap gap-1.5 pt-0.5">
                                   {token.assigned_recipients.map((rec, idx) => (
                                     <span
                                       key={idx}
-                                      className="inline-flex items-center gap-1 text-[11px] font-mono bg-slate-900 px-2 py-1 rounded-md border border-slate-700 text-slate-300"
+                                      className="inline-flex items-center gap-1 text-[11px] font-mono bg-slate-950 px-2 py-1 rounded-md border border-slate-800 text-slate-300"
                                     >
                                       <span>{rec.name}:</span>
                                       <span className="text-emerald-400">{rec.mobile}</span>
@@ -871,7 +904,7 @@ export function AgentTokenTracker() {
                         </div>
 
                         {/* QR Code and Quick Tracking Link */}
-                        <div className="p-4 rounded-xl bg-[#0F1633]/80 border border-slate-800 flex items-center gap-4">
+                        <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center gap-4">
                           {qrUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -880,28 +913,28 @@ export function AgentTokenTracker() {
                               className="w-20 h-20 bg-white p-1 rounded-xl shrink-0"
                             />
                           ) : (
-                            <div className="w-20 h-20 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0">
+                            <div className="w-20 h-20 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0">
                               <QrCode className="w-8 h-8 text-slate-600 animate-pulse" />
                             </div>
                           )}
 
                           <div className="space-y-1.5 flex-1 min-w-0">
                             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                              Public Tracking Link
+                              Public Certificate Link
                             </span>
-                            <p className="text-xs font-mono text-slate-400 truncate">
+                            <p className="text-xs font-mono text-cyan-300 truncate">
                               /track/{token.token_number}
                             </p>
                             <div className="flex flex-wrap items-center gap-2 pt-1">
                               <button
                                 type="button"
                                 onClick={() => handleCopyLink(token.token_number, token.id)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
                               >
                                 {copiedId === token.id ? (
                                   <>
                                     <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                    <span className="text-emerald-400 font-bold">Copied!</span>
+                                    <span className="text-emerald-400">Copied!</span>
                                   </>
                                 ) : (
                                   <>
@@ -914,9 +947,9 @@ export function AgentTokenTracker() {
                               <Link
                                 href={`/track/${encodeURIComponent(token.token_number)}`}
                                 target="_blank"
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 hover:text-white text-xs font-medium transition-colors"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 hover:text-white text-xs font-semibold transition-colors"
                               >
-                                <span>Open Full Page</span>
+                                <span>Certificate</span>
                                 <ExternalLink className="w-3 h-3" />
                               </Link>
 
@@ -926,10 +959,10 @@ export function AgentTokenTracker() {
                                 )}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 hover:text-white text-xs font-medium transition-colors"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 hover:text-white text-xs font-semibold transition-colors"
                               >
                                 <Share2 className="w-3 h-3" />
-                                <span>Share</span>
+                                <span>WhatsApp</span>
                               </a>
                             </div>
                           </div>
