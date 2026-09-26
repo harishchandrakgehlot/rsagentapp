@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import {
   updateReminderDeliveryStatus,
   recordIncomingWhatsAppMessage,
+  recordOutboundWhatsAppMessage,
   syncStoreFromCloud,
   persistStoreToCloud,
 } from '@/lib/store';
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
       console.warn('[webhook] META_APP_SECRET not set — HMAC signature verification skipped. Set this env var for production security.');
     }
 
+    console.log('[webhook] Incoming webhook payload:', rawBody);
     const payload = JSON.parse(rawBody);
 
     await syncStoreFromCloud();
@@ -61,6 +63,8 @@ export async function POST(request: Request) {
     for (const entry of entries) {
       const changes = entry.changes || [];
       for (const change of changes) {
+        const field = change.field;
+
         // 1. Delivery Receipts & Statuses
         const statuses = change.value?.statuses || [];
         for (const st of statuses) {
@@ -74,19 +78,14 @@ export async function POST(request: Request) {
           }
         }
 
-        // 2. Incoming Messages / Replies from Clients and Agents
+        // 2. Incoming Messages or Mobile App Echoes
         const messages = change.value?.messages || [];
         const contacts = change.value?.contacts || [];
+        const isEcho = field === 'smb_message_echoes';
+
         for (const msg of messages) {
           const fromPhone = msg.from;
-          if (!fromPhone) continue;
-
-          interface ContactProfile {
-            wa_id?: string;
-            profile?: { name?: string };
-          }
-          const contact = (contacts as ContactProfile[]).find(c => c.wa_id === fromPhone);
-          const senderName = contact?.profile?.name;
+          const toPhone = msg.to;
           const msgType = msg.type || 'text';
 
           let textBody = '';
@@ -107,17 +106,41 @@ export async function POST(request: Request) {
             textBody = `[${msgType} message]`;
           }
 
-          recordIncomingWhatsAppMessage({
-            provider_message_id: msg.id || `wamid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            sender_phone: fromPhone,
-            sender_name: senderName,
-            message_text: textBody,
-            message_type: msgType,
-            timestamp: msg.timestamp
-              ? new Date(Number(msg.timestamp) * 1000).toISOString()
-              : new Date().toISOString(),
-          });
-          hasMutations = true;
+          if (isEcho || msg.echo) {
+            // Message sent by the business owner from their mobile WhatsApp app
+            const targetPhone = toPhone || fromPhone;
+            if (targetPhone) {
+              recordOutboundWhatsAppMessage({
+                provider_message_id: msg.id || `echo-${Date.now()}`,
+                recipient_phone: targetPhone,
+                recipient_name: 'Royal Services (Mobile)',
+                message_text: textBody,
+              });
+              hasMutations = true;
+            }
+          } else {
+            // Message sent by a customer/client to the business
+            if (!fromPhone) continue;
+
+            interface ContactProfile {
+              wa_id?: string;
+              profile?: { name?: string };
+            }
+            const contact = (contacts as ContactProfile[]).find(c => c.wa_id === fromPhone);
+            const senderName = contact?.profile?.name;
+
+            recordIncomingWhatsAppMessage({
+              provider_message_id: msg.id || `wamid-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              sender_phone: fromPhone,
+              sender_name: senderName,
+              message_text: textBody,
+              message_type: msgType,
+              timestamp: msg.timestamp
+                ? new Date(Number(msg.timestamp) * 1000).toISOString()
+                : new Date().toISOString(),
+            });
+            hasMutations = true;
+          }
         }
       }
     }
